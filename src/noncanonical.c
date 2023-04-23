@@ -68,12 +68,13 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
-    printf("New termios structure set\n");
+    printf("New termios structure set.\n");
+    printf("Waiting on a transmission.\n");
 
     while (STOP == FALSE) {       /* loop for input */
         res = read(fd, buf, 255); /* returns after 255 chars have been input */
         buf[res] = '\0';          /* so we can printf... */
-        printf(":%s:%d\n", buf, res);
+        printf("%s\n\t>%d chars received\n", buf, res);
         if (buf[0] == 'z' && res <= 2)
             STOP = TRUE;
     }

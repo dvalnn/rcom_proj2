@@ -74,13 +74,13 @@ int main(int argc, char** argv) {
     }
 
     printf("New termios structure set\n");
-    printf("Waiting for user input. [max 255 char]\n");
+    printf("Waiting for user input. [max 255 chars]\n");
 
     int bytes_read = 0;
     while (scanf(" %255[^\n]%n", buf, &bytes_read) == 1) {
         if (bytes_read > 0) {
             int bytes_written = write(fd, buf, bytes_read);
-            printf("%d bytes written\n", bytes_written);
+            printf("\t>%d bytes sent\n", bytes_written);
 
             if (buf[0] == 'z' && bytes_written <= 2) {
                 break;
