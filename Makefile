@@ -10,24 +10,36 @@ DEBUG_LEVEL=2
 # _PRINT_PACKET_DATA is used to print the packet data that is received by RX
 CFLAGS = -Wall -g -D _DEBUG=$(DEBUG_LEVEL)
 
-SRC = src/
-INCLUDE = include/
-BIN = bin/
+SRC = src
+INCLUDE = include
+BIN = bin
 
 # Targets
-.PHONY: all
-all: $(BIN)/main
 
-$(BIN)/main: main.c $(SRC)/*.c
+.PHONY: all
+
+all: $(BIN)/receiver.out $(BIN)/transmitter.out
+
+$(BIN)/receiver.out: $(SRC)/noncanonical.c
 	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
 
-.PHONY: run
-run: $(BIN)/main
-	./$(BIN)/main
+$(BIN)/transmitter.out: $(SRC)/writenoncanonical.c
+	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
 
-docs: $(BIN)/main
-	doxygen Doxyfile
+#.PHONY: all
+#all: $(BIN)/main
+#
+#$(BIN)/main: main.c $(SRC)/*.c
+#	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
+#
+#.PHONY: run
+#run: $(BIN)/main
+#	./$(BIN)/main
+#
+#docs: $(BIN)/main
+#	doxygen Doxyfile
+#
 
 .PHONY: clean
 clean:
-	rm -f $(BIN)/main
+	rm -f $(BIN)/*
