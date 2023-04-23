@@ -16,10 +16,12 @@
 
 volatile int STOP = FALSE;
 
+#define BUF_SIZE 255
+
 int main(int argc, char** argv) {
     int fd, c, res;
     struct termios oldtio, newtio;
-    char buf[255];
+    char buf[BUF_SIZE];
     int i, sum = 0, speed = 0;
 
     if ((argc < 2) ||
@@ -71,15 +73,12 @@ int main(int argc, char** argv) {
     }
 
     printf("New termios structure set\n");
+    printf("Waiting for user input. [max 255 char]\n");
 
-    for (i = 0; i < 255; i++) {
-        buf[i] = 'a';
-    }
+    int bytes_read = 0;
+    scanf("%255[^\n]%n", buf, &bytes_read);
 
-    /*testing*/
-    buf[25] = '\n';
-
-    res = write(fd, buf, 255);
+    res = write(fd, buf, bytes_read);
     printf("%d bytes written\n", res);
 
     /*
