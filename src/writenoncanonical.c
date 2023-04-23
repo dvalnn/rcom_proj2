@@ -85,6 +85,8 @@ int main(int argc, char** argv) {
             if (buf[0] == 'z' && bytes_written <= 2) {
                 break;
             }
+            bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
+            printf("\t>Echo received (%d chars): %s\n", bytes_read, buf);
         }
     }
 

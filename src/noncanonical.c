@@ -16,7 +16,8 @@
 volatile int STOP = FALSE;
 
 int main(int argc, char** argv) {
-    int fd, c, res;
+    // int fd, c, res;
+    int fd, res;
     struct termios oldtio, newtio;
     char buf[255];
 
@@ -77,6 +78,9 @@ int main(int argc, char** argv) {
         printf("%s\n\t>%d chars received\n", buf, res);
         if (buf[0] == 'z' && res <= 2)
             STOP = TRUE;
+        printf("\techoing back... ");
+        res = write(fd, buf, res);  // echoes back received message
+        printf("%d chars sent\n", res);
     }
 
     /*
