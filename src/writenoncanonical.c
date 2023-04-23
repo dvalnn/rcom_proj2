@@ -19,10 +19,11 @@ volatile int STOP = FALSE;
 #define BUF_SIZE 255
 
 int main(int argc, char** argv) {
-    int fd, c, res;
+    int fd;
+    // int fd, c, res;
     struct termios oldtio, newtio;
     char buf[BUF_SIZE];
-    int i, sum = 0, speed = 0;
+    // int i, sum = 0, speed = 0;
 
     if ((argc < 2) ||
         ((strcmp("/dev/ttyS0", argv[1]) != 0) &&
@@ -76,10 +77,16 @@ int main(int argc, char** argv) {
     printf("Waiting for user input. [max 255 char]\n");
 
     int bytes_read = 0;
-    scanf("%255[^\n]%n", buf, &bytes_read);
+    while (scanf(" %255[^\n]%n", buf, &bytes_read) == 1) {
+        if (bytes_read > 0) {
+            int bytes_written = write(fd, buf, bytes_read);
+            printf("%d bytes written\n", bytes_written);
 
-    res = write(fd, buf, bytes_read);
-    printf("%d bytes written\n", res);
+            if (buf[0] == 'z' && bytes_written <= 2) {
+                break;
+            }
+        }
+    }
 
     /*
     O ciclo FOR e as instruções seguintes devem ser alterados de modo a respeitar

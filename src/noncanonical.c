@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
         res = read(fd, buf, 255); /* returns after 255 chars have been input */
         buf[res] = '\0';          /* so we can printf... */
         printf(":%s:%d\n", buf, res);
-        if (buf[0] == 'z')
+        if (buf[0] == 'z' && res <= 2)
             STOP = TRUE;
     }
 
