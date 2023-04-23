@@ -90,11 +90,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    /*
-    O ciclo FOR e as instruções seguintes devem ser alterados de modo a respeitar
-    o indicado no guião
-    */
-
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
         perror("tcsetattr");
         exit(-1);
