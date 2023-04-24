@@ -20,12 +20,17 @@ volatile int STOP = FALSE;
 
 void set_connection(int fd) {
     LOG("Sending SET message\n");
-    char buf[255] = '\0';
+    char set[] = {F, A, C, BCC, F};
+
+    char buf[255];
+    buf[0] = '\0';
 
     while (strcmp(buf, "WAH") != 0) {
         write(fd, set, sizeof(set));
         read(fd, buf, 255);
     }
+
+    LOG("SET Successfull\n");
 }
 
 int main(int argc, char** argv) {
@@ -79,10 +84,9 @@ int main(int argc, char** argv) {
         perror("tcsetattr");
         exit(-1);
     }
-    char* set = [ F, A, C, BCC, F ];
 
     LOG("New termios structure set\n");
-
+    set_connection(fd);
     LOG("Waiting for user input. [max 255 chars]\n");
 
     int bytes_read = 0;
