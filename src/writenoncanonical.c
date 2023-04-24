@@ -9,6 +9,7 @@
 #include <stdlib.h>
 
 #include "log.h"
+#include "macros.h"
 
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
@@ -17,7 +18,15 @@
 
 volatile int STOP = FALSE;
 
-#define BUF_SIZE 255
+void set_connection(int fd) {
+    LOG("Sending SET message\n");
+    char buf[255] = '\0';
+
+    while (strcmp(buf, "WAH") != 0) {
+        write(fd, set, sizeof(set));
+        read(fd, buf, 255);
+    }
+}
 
 int main(int argc, char** argv) {
     int fd;
@@ -27,7 +36,7 @@ int main(int argc, char** argv) {
     // int i, sum = 0, speed = 0;
 
     if (argc < 2) {
-        printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
+        LOG("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
         exit(1);
     }
 
@@ -70,21 +79,23 @@ int main(int argc, char** argv) {
         perror("tcsetattr");
         exit(-1);
     }
+    char* set = [ F, A, C, BCC, F ];
 
-    printf("New termios structure set\n");
-    printf("Waiting for user input. [max 255 chars]\n");
+    LOG("New termios structure set\n");
+
+    LOG("Waiting for user input. [max 255 chars]\n");
 
     int bytes_read = 0;
     while (scanf(" %255[^\n]%n", buf, &bytes_read) == 1) {
         if (bytes_read > 0) {
             int bytes_written = write(fd, buf, bytes_read);
-            printf("\t>%d bytes sent\n", bytes_written);
+            LOG("\t>%d bytes sent\n", bytes_written);
 
             if (buf[0] == 'z' && bytes_written <= 2) {
                 break;
             }
             bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
-            printf("\t>Echo received (%d chars): %s\n", bytes_read, buf);
+            LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
         }
     }
 
