@@ -22,12 +22,12 @@ void set_connection(int fd) {
     LOG("Sending SET message\n");
     char set[] = {F, A, C, BCC, F};
 
-    char buf[255];
+    char buf[BUF_SIZE];
     buf[0] = '\0';
 
     while (strcmp(buf, "WAH") != 0) {
         write(fd, set, sizeof(set));
-        read(fd, buf, 255);
+        read(fd, buf, BUF_SIZE);
     }
 
     LOG("SET Successfull\n");
