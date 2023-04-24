@@ -11,20 +11,43 @@ DEBUG_LEVEL=2
 CFLAGS = -Wall -g -D _DEBUG=$(DEBUG_LEVEL)
 
 SRC = src
+LIB = lib
 INCLUDE = include
 BIN = bin
 
-# Targets
+RECEIVER = noncanonical.c
+TRANSMITTER = writenoncanonical.c
+BUILDEXTENS = out
 
+SERIAL1 = /dev/ttyS10
+SERIAL2 = /dev/ttyS11
+
+# Targets
 .PHONY: all
 
-all: $(BIN)/receiver.out $(BIN)/transmitter.out
+all: $(BIN)/receiver.$(BUILDEXTENS) $(BIN)/transmitter.$(BUILDEXTENS)
 
-$(BIN)/receiver.out: $(SRC)/noncanonical.c
+$(BIN)/receiver.$(BUILDEXTENS): $(SRC)/$(RECEIVER) #$(LIB)/*.c
 	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
 
-$(BIN)/transmitter.out: $(SRC)/writenoncanonical.c
+$(BIN)/transmitter.$(BUILDEXTENS): $(SRC)/$(TRANSMITTER) #$(LIB)/*.c
 	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
+
+.PHONY: clean
+clean:
+	rm -f $(BIN)/*
+
+.PHONY: socat
+socat: 
+	sudo socat -d -d PTY,link=/dev/ttyS10,mode=777 PTY,link=/dev/ttyS11,mode=777
+
+.PHONY: runt
+runt:
+	./$(BIN)/transmitter.$(BUILDEXTENS) $(SERIAL1)
+
+.PHONY: runr
+runr:
+	./$(BIN)/receiver.$(BUILDEXTENS) $(SERIAL2)
 
 #.PHONY: all
 #all: $(BIN)/main
@@ -39,11 +62,3 @@ $(BIN)/transmitter.out: $(SRC)/writenoncanonical.c
 #docs: $(BIN)/main
 #	doxygen Doxyfile
 #
-
-.PHONY: clean
-clean:
-	rm -f $(BIN)/*
-
-.Phony: socat
-socat: 
-	sudo socat -d -d PTY,link=/dev/ttyS10,mode=777 PTY,link=/dev/ttyS11,mode=777
