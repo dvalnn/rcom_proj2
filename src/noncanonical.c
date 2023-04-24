@@ -79,7 +79,7 @@ states state_update(states cur_state, unsigned char rcved) {
 void state_handler(int fd) {
     states cur_state = st_START;
 
-    unsigned char flag;
+    unsigned char flag = '\0';
 
     while (cur_state != st_STOP) {
         LOG("Current State: %d\n", cur_state);
