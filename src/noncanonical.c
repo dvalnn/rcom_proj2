@@ -33,11 +33,13 @@ states state_update(states cur_state, unsigned char rcved) {
 
     switch (cur_state) {
         case st_START:
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", F, (unsigned int)(rcved & 0xFF));
             if (rcved == F)
                 new_state = st_FLAG_RCV;
             break;
 
         case st_FLAG_RCV:
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", A, (unsigned int)(rcved & 0xFF));
             if (rcved == A)
                 new_state = st_A_RCV;
             else if (rcved != F)
@@ -45,28 +47,31 @@ states state_update(states cur_state, unsigned char rcved) {
             break;
 
         case st_A_RCV:
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", C, (unsigned int)(rcved & 0xFF));
             if (rcved == C)
                 new_state = st_C_RCV;
-            if (rcved == F)
+            else if (rcved == F)
                 new_state = st_FLAG_RCV;
             else
                 new_state = st_START;
             break;
 
         case st_C_RCV:
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", BCC, (unsigned int)(rcved & 0xFF));
             if (rcved == BCC)
                 new_state = st_BCC_OK;
-            if (rcved == F)
+            else if (rcved == F)
                 new_state = st_FLAG_RCV;
             else
                 new_state = st_START;
             break;
 
         case st_BCC_OK:
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", F, (unsigned int)(rcved & 0xFF));
             if (rcved == F)
                 new_state = st_STOP;
             else
-                new_state == st_START;
+                new_state = st_START;
             break;
 
         case st_STOP:
@@ -76,25 +81,52 @@ states state_update(states cur_state, unsigned char rcved) {
     return new_state;
 }
 
-void state_handler(int fd) {
+int parse_message(unsigned char* message, int message_length) {
     states cur_state = st_START;
+    printf("\n");
+    LOG("--Set Detection START--\n");
 
-    unsigned char flag = '\0';
-
-    while (cur_state != st_STOP) {
-        LOG("Current State: %d\n", cur_state);
-        short byte = read(fd, flag, 1);
-        if (byte != 1)
-            ERROR("Could not read char from file descriptor\n");
-        cur_state = state_update(cur_state, flag);
+    for (int i = 0; i < message_length; i++) {
+        LOG("\tChar received: 0x%.02x (position %d)\n", (unsigned int)(message[i] & 0xff), i);
+        cur_state = state_update(cur_state, message[i]);
+        LOG("\tCurrent state: %d\n", cur_state);
+        if (cur_state == st_STOP)
+            break;
     }
-    write(fd, "WAH", sizeof("WAH"));
+
+    return cur_state == st_STOP;
 }
 
-#undef F
-#undef A
-#undef C
-#undef BCC
+void state_handler(int fd) {
+    unsigned char buf[BUF_SIZE];
+    while (1) {
+        int lenght = read(fd, buf, sizeof(buf));
+        LOG("Received %d characters\n", lenght);
+        if (parse_message(buf, lenght))
+            break;
+        else
+            write(fd, "Retry SET", sizeof("Retry SET"));
+    }
+    write(fd, "UA", sizeof("UA"));
+}
+
+// void state_handler(int fd) {
+//     states cur_state = st_START;
+//     states old_state = st_START;
+
+//     unsigned char flag[] = "0";
+
+//     while (cur_state != st_STOP) {
+//         LOG("Current State: %d\n", cur_state);
+//         read(fd, flag, sizeof(flag));
+//         LOG("Char received: 0x%.02x\n", (unsigned int)(flag[0] & 0xff));
+//         cur_state = state_update(cur_state, flag[0]);
+//         if (cur_state < old_state)
+//             write(fd, "Re-send", sizeof("Re-send"));
+//         old_state = cur_state;
+//     }
+//     write(fd, "WAH", sizeof("WAH"));
+// }
 
 #pragma endregion
 

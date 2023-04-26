@@ -19,14 +19,15 @@
 volatile int STOP = FALSE;
 
 void set_connection(int fd) {
-    LOG("Sending SET message\n");
-    char set[] = {F, A, C, BCC, F};
-
+    unsigned char set[] = {F, A, C, BCC, F};
     char buf[BUF_SIZE];
     buf[0] = '\0';
 
-    while (strcmp(buf, "WAH") != 0) {
+    int i = 0;
+    while (strcmp(buf, "UA") != 0) {
+        LOG("Sending SET message number %d\n", ++i);
         write(fd, set, sizeof(set));
+        sleep(1);
         read(fd, buf, BUF_SIZE);
     }
 
