@@ -20,7 +20,16 @@
  */
 #define _LOG(prefix, ...) printf("[" prefix "] " __VA_ARGS__)
 
-#if _DEBUG >= 3
+#if _DEBUG >= 1
+/**
+ * Prints the formatted message with level INFO
+ */
+#define INFO(...) _LOG("INFO", __VA_ARGS__)
+#else
+#define INFO(...)
+#endif
+#if _DEBUG >= 2
+
 /**
  * Prints the formatted message with level LOG
  */
@@ -29,16 +38,7 @@
 #define LOG(...)
 #endif
 
-#if _DEBUG >= 2
-/**
- * Prints the formatted message with level INFO
- */
-#define INFO(...) _LOG("INFO", __VA_ARGS__)
-#else
-#define INFO(...)
-#endif
-
-#if _DEBUG >= 1
+#if _DEBUG >= 3
 /**
  * Prints the formatted message with level ALARM
  */
