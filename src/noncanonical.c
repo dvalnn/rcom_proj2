@@ -9,27 +9,34 @@
 #include <stdlib.h>
 
 #include "log.h"
-#include "macros.h"
 
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
 
+#define BUF_SIZE 255
+
 volatile int STOP = FALSE;
 
-#pragma region states
-typedef enum states {
+#pragma region SET_Con
+
+#define F 0x5C
+#define A 0x01
+#define C 0x03
+#define BCC (A ^ C)
+
+typedef enum set_states {
     st_START,
     st_FLAG_RCV,
     st_A_RCV,
     st_C_RCV,
     st_BCC_OK,
     st_STOP
-} states;
+} set_states;
 
-states state_update(states cur_state, unsigned char rcved) {
-    states new_state = cur_state;
+set_states state_update(set_states cur_state, unsigned char rcved) {
+    set_states new_state = cur_state;
 
     switch (cur_state) {
         case st_START:
@@ -82,9 +89,9 @@ states state_update(states cur_state, unsigned char rcved) {
 }
 
 int parse_message(unsigned char* message, int message_length) {
-    states cur_state = st_START;
+    set_states cur_state = st_START;
     printf("\n");
-    LOG("--Set Detection START--\n");
+    INFO("--Set Detection START--\n");
 
     for (int i = 0; i < message_length; i++) {
         LOG("\tChar received: 0x%.02x (position %d)\n", (unsigned int)(message[i] & 0xff), i);
@@ -97,36 +104,36 @@ int parse_message(unsigned char* message, int message_length) {
     return cur_state == st_STOP;
 }
 
-void state_handler(int fd) {
+int set_connection(int fd) {
     unsigned char buf[BUF_SIZE];
-    while (1) {
-        int lenght = read(fd, buf, sizeof(buf));
-        LOG("Received %d characters\n", lenght);
-        if (parse_message(buf, lenght))
-            break;
-        else
-            write(fd, "Retry SET", sizeof("Retry SET"));
-    }
-    write(fd, "UA", sizeof("UA"));
+    int lenght = read(fd, buf, sizeof(buf));
+    LOG("Received %d characters\n", lenght);
+    return parse_message(buf, lenght);
 }
 
-// void state_handler(int fd) {
-//     states cur_state = st_START;
-//     states old_state = st_START;
+#undef F
+#undef A
+#undef C
+#undef BCC
 
-//     unsigned char flag[] = "0";
+#pragma endregion
 
-//     while (cur_state != st_STOP) {
-//         LOG("Current State: %d\n", cur_state);
-//         read(fd, flag, sizeof(flag));
-//         LOG("Char received: 0x%.02x\n", (unsigned int)(flag[0] & 0xff));
-//         cur_state = state_update(cur_state, flag[0]);
-//         if (cur_state < old_state)
-//             write(fd, "Re-send", sizeof("Re-send"));
-//         old_state = cur_state;
-//     }
-//     write(fd, "WAH", sizeof("WAH"));
-// }
+#pragma region UA_Con
+
+#define F 0x5C
+#define A 0x01
+#define C 0x07
+#define BCC (A ^ C)
+
+void ua_connection(int fd) {
+    unsigned char set[] = {F, A, C, BCC, F};
+    write(fd, set, sizeof(set));
+}
+
+#undef F
+#undef A
+#undef C
+#undef BCC
 
 #pragma endregion
 
@@ -184,19 +191,24 @@ int main(int argc, char** argv) {
     printf("New termios structure set.\n");
     printf("Waiting on SET transmission.\n");
 
-    state_handler(fd);
+    for (int tries = 1;; tries++) {
+        LOG("Awaiting SET/UA connection. Tries: %d\n", tries);
+        set_connection(fd);
+        ua_connection(fd);
+        break;
+    }
 
-    LOG("SET successfull\n");
+    LOG("SET/UA successfull\n");
 
     while (STOP == FALSE) {       /* loop for input */
         res = read(fd, buf, 255); /* returns after 255 chars have been input */
         buf[res] = '\0';          /* so we can printf... */
-        printf("%s\n\t>%d chars received\n", buf, res);
+        INFO("%s\n\t>%d chars received\n", buf, res);
         if (buf[0] == 'z' && res <= 2)
             STOP = TRUE;
-        printf("\techoing back... ");
+        LOG("\techoing back... ");
         res = write(fd, buf, res);  // echoes back received message
-        printf("%d chars sent\n", res);
+        LOG("%d chars sent\n", res);
     }
 
     /*
@@ -207,3 +219,5 @@ int main(int argc, char** argv) {
     close(fd);
     return 0;
 }
+
+#undef BUF_SIZE
