@@ -8,7 +8,7 @@ DEBUG_LEVEL = 3
 
 # _DEBUG is used to include internal logging of errors and general information. Levels go from 1 to 3, highest to lowest priority respectively
 # _PRINT_PACKET_DATA is used to print the packet data that is received by RX
-CFLAGS = -Wall -g -D _DEBUG=$(DEBUG_LEVEL)
+CFLAGS = -Wall -Wno-unknown-pragmas -Wno-implicit-function-declaration -g -D _DEBUG=$(DEBUG_LEVEL)
 
 SRC = src
 LIB = lib

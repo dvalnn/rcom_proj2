@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #include "log.h"
 
@@ -18,6 +19,9 @@
 #define BUF_SIZE 255
 
 volatile int STOP = FALSE;
+
+// Global Variables for alarms
+// int alarm_flag = 1, alarm_counter = 1;
 
 #pragma region SET_Con
 
@@ -106,7 +110,9 @@ int parse_message(unsigned char* message, int message_length) {
 
 int set_connection(int fd) {
     unsigned char buf[BUF_SIZE];
+    alarm(3);
     int lenght = read(fd, buf, sizeof(buf));
+    alarm(3);
     LOG("Received %d characters\n", lenght);
     return parse_message(buf, lenght);
 }
@@ -137,11 +143,24 @@ void ua_connection(int fd) {
 
 #pragma endregion
 
+#pragma region Alarm_Cont
+
+void on_alarm()  // atende alarme
+{
+    ALARM("Alarm Interrupt Triggered\n");
+    // alarm_flag = 1;
+    // alarm_counter++;
+}
+
+#pragma endregion
+
 int main(int argc, char** argv) {
     // int fd, c, res;
     int fd, res;
     struct termios oldtio, newtio;
     char buf[255];
+
+    (void)signal(SIGALRM, on_alarm);
 
     if (argc < 2) {
         printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
@@ -173,8 +192,10 @@ int main(int argc, char** argv) {
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME] = 0; /* inter-character timer unused */
-    newtio.c_cc[VMIN] = 1;  /* blocking read until 5 chars received */
+    // VTIME = 0.1 para esperar 100 ms por read
+    // VMIN = 0 para não ficar bloqueado à espera de um caractere
+    newtio.c_cc[VTIME] = 0.1; /* inter-character timer unused */
+    newtio.c_cc[VMIN] = 0;    /* blocking read until 5 chars received */
 
     /*
     VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a

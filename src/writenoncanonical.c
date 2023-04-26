@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #include "log.h"
 
@@ -174,8 +175,10 @@ int main(int argc, char** argv) {
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME] = 0; /* inter-character timer unused */
-    newtio.c_cc[VMIN] = 1;  /* blocking read until 5 chars received */
+    // VTIME = 0.1 para esperar 100 ms por read
+    // VMIN = 0 para não ficar bloqueado à espera de um caractere
+    newtio.c_cc[VTIME] = 0.1; /* inter-character timer unused */
+    newtio.c_cc[VMIN] = 0;    /* blocking read until 5 chars received */
 
     /*
     VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
