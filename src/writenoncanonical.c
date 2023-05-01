@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #include "log.h"
 
@@ -19,6 +20,19 @@
 volatile int STOP = FALSE;
 
 #define BUF_SIZE 255
+#define MAX_RETRIES 5
+
+#pragma region Alarm_Cont
+
+bool retry_con = false;
+
+void on_alarm()  // atende alarme
+{
+    ALARM("Alarm Interrupt Triggered\n");
+    retry_con = true;
+}
+
+#pragma endregion
 
 #pragma region SET_Con
 
@@ -114,7 +128,7 @@ int parse_message(unsigned char* message, int message_length) {
     INFO("--UA Detection START--\n");
 
     for (int i = 0; i < message_length; i++) {
-        LOG("\tChar received: 0x%.02x (position %d)\n", (unsigned int)(message[i] & 0xff), i);
+        LOG("\tChar received: 0x%.02x, same as: %c (position %d)\n", message[i], (unsigned int)(message[i] & 0xff), i);
         cur_state = ua_state_update(cur_state, message[i]);
         LOG("\tCurrent state: %d\n", cur_state);
         if (cur_state == ua_STOP)
@@ -127,8 +141,11 @@ int parse_message(unsigned char* message, int message_length) {
 int ua_connection(int fd) {
     unsigned char buf[BUF_SIZE];
     int lenght = read(fd, buf, sizeof(buf));
-    LOG("Received %d characters\n", lenght);
-    return parse_message(buf, lenght);
+    if (lenght) {
+        LOG("Received %d characters\n", lenght);
+        return parse_message(buf, lenght);
+    }
+    return 0;
 }
 
 #undef F
@@ -138,15 +155,42 @@ int ua_connection(int fd) {
 
 #pragma endregion
 
+bool establish_connection(int fd) {
+    for (int tries = 1; tries < MAX_RETRIES; tries++) {
+        LOG("Attemping SET/UA connection.\n\t- Attempt number: %d\n", tries);
+        set_connection(fd);
+
+        alarm(3);
+
+        while (!retry_con) {
+            if (ua_connection(fd)) {
+                alarm(0);
+                return true;
+            }
+        }
+
+        if (!retry_con)
+            break;
+
+        ALARM("SET/UA Connection failed.\n\t- Trying again in 2 seconds.\n");
+        retry_con = false;
+        sleep(2);
+    }
+
+    return false;
+}
+
 int main(int argc, char** argv) {
     int fd;
     // int fd, c, res;
     struct termios oldtio, newtio;
-    char buf[BUF_SIZE];
-    // int i, sum = 0, speed = 0;
+    // char buf[BUF_SIZE];
+    //  int i, sum = 0, speed = 0;
+
+    (void)signal(SIGALRM, on_alarm);
 
     if (argc < 2) {
-        LOG("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
+        INFO("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
         exit(1);
     }
 
@@ -175,15 +219,11 @@ int main(int argc, char** argv) {
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    // VTIME = 0.1 para esperar 100 ms por read
-    // VMIN = 0 para não ficar bloqueado à espera de um caractere
-    newtio.c_cc[VTIME] = 0.1; /* inter-character timer unused */
-    newtio.c_cc[VMIN] = 0;    /* blocking read until 5 chars received */
-
-    /*
-    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
-    leitura do(s) próximo(s) caracter(es)
-    */
+    // VTIME = 1 para esperar 100 ms por read
+    //* VTIME - Timeout in deciseconds for noncanonical read.
+    //* VMIN - Minimum number of characters for noncanonical read.
+    newtio.c_cc[VTIME] = 1;
+    newtio.c_cc[VMIN] = 0;
 
     tcflush(fd, TCIOFLUSH);
 
@@ -192,36 +232,34 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
-    LOG("New termios structure set\n");
+    LOG("New termios structure set.\n");
 
-    for (int tries = 1;; tries++) {
-        LOG("Attemping SET/UA connection. Tries: %d\n", tries);
-        set_connection(fd);
-        if (ua_connection(fd))
-            break;
+    if (!establish_connection(fd)) {
+        INFO("Failed to establish serial port connection.\n");
+        return -1;
     }
 
-    LOG("SET/UA successfull\n");
-    INFO("Waiting for user input. [max 255 chars]\n");
+    INFO("SET/UA successfull.\n");
+    // INFO("Waiting for user input. [max 255 chars]\n");
 
-    int bytes_read = 0;
-    while (scanf(" %255[^\n]%n", buf, &bytes_read) == 1) {
-        if (bytes_read > 0) {
-            int bytes_written = write(fd, buf, bytes_read);
-            LOG("\t>%d bytes sent\n", bytes_written);
+    // int bytes_read = 0;
+    // while (scanf(" %255[^\n]%n", buf, &bytes_read) == 1) {
+    //     if (bytes_read > 0) {
+    //         int bytes_written = write(fd, buf, bytes_read);
+    //         LOG("\t>%d bytes sent\n", bytes_written);
 
-            if (buf[0] == 'z' && bytes_written <= 2) {
-                break;
-            }
-            bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
-            LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
-        }
-    }
+    //         if (buf[0] == 'z' && bytes_written <= 2) {
+    //             break;
+    //         }
+    //         bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
+    //         LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
+    //     }
+    // }
 
-    if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
-        perror("tcsetattr");
-        exit(-1);
-    }
+    // if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
+    //     perror("tcsetattr");
+    //     exit(-1);
+    // }
 
     close(fd);
     return 0;

@@ -110,13 +110,13 @@ int parse_message(unsigned char* message, int message_length) {
 
 int set_connection(int fd) {
     unsigned char buf[BUF_SIZE];
-    alarm(3);
     int lenght = read(fd, buf, sizeof(buf));
-    alarm(3);
-    LOG("Received %d characters\n", lenght);
-    return parse_message(buf, lenght);
+    if (lenght) {
+        LOG("Received %d characters\n", lenght);
+        return parse_message(buf, lenght);
+    }
+    return 0;
 }
-
 #undef F
 #undef A
 #undef C
@@ -131,10 +131,10 @@ int set_connection(int fd) {
 #define C 0x07
 #define BCC (A ^ C)
 
-void ua_connection(int fd) {
-    unsigned char set[] = {F, A, C, BCC, F};
-    write(fd, set, sizeof(set));
-}
+    void ua_connection(int fd) {
+        unsigned char set[] = {F, A, C, BCC, F};
+        write(fd, set, sizeof(set));
+    }
 
 #undef F
 #undef A
@@ -143,102 +143,104 @@ void ua_connection(int fd) {
 
 #pragma endregion
 
-#pragma region Alarm_Cont
+#pragma region Alarm Control
 
-void on_alarm()  // atende alarme
-{
-    ALARM("Alarm Interrupt Triggered\n");
-    // alarm_flag = 1;
-    // alarm_counter++;
-}
+    void on_alarm()  // atende alarme
+    {
+        ALARM("Alarm Interrupt Triggered\n");
+        // alarm_flag = 1;
+        // alarm_counter++;
+    }
 
 #pragma endregion
 
-int main(int argc, char** argv) {
-    // int fd, c, res;
-    int fd, res;
-    struct termios oldtio, newtio;
-    char buf[255];
+    int main(int argc, char** argv) {
+        // int fd, c, res;
+        int fd;  //, res;
+        struct termios oldtio, newtio;
+        // char buf[255];
 
-    (void)signal(SIGALRM, on_alarm);
+        (void)signal(SIGALRM, on_alarm);
 
-    if (argc < 2) {
-        printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
-        exit(1);
+        if (argc < 2) {
+            printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
+            exit(1);
+        }
+
+        /*
+        Open serial port device for reading and writing and not as controlling tty
+        because we don't want to get killed if linenoise sends CTRL-C.
+        */
+
+        fd = open(argv[1], O_RDWR | O_NOCTTY);
+        if (fd < 0) {
+            perror(argv[1]);
+            exit(-1);
+        }
+
+        sleep(1);
+        if (tcgetattr(fd, &oldtio) == -1) { /* save current port settings */
+            perror("tcgetattr");
+            exit(-1);
+        }
+
+        bzero(&newtio, sizeof(newtio));
+        newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+        newtio.c_iflag = IGNPAR;
+        newtio.c_oflag = 0;
+
+        /* set input mode (non-canonical, no echo,...) */
+        newtio.c_lflag = 0;
+
+        // VTIME = 1 para esperar 100 ms por read
+        //* VTIME - Timeout in deciseconds for noncanonical read.
+        //* VMIN - Minimum number of characters for noncanonical read.
+        newtio.c_cc[VTIME] = 1;
+        newtio.c_cc[VMIN] = 0;
+
+        /*
+        VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
+        leitura do(s) próximo(s) caracter(es)
+        */
+
+        tcflush(fd, TCIOFLUSH);
+
+        if (tcsetattr(fd, TCSANOW, &newtio) == -1) {
+            perror("tcsetattr");
+            exit(-1);
+        }
+
+        printf("New termios structure set.\n");
+        printf("Waiting on SET transmission.\n");
+
+        LOG("Awaiting SET/UA connection.");
+
+        while (1) {
+            if (set_connection(fd)) {
+                LOG("SET successfull\n");
+                ua_connection(fd);
+                break;
+            }
+        }
+
+        // while (STOP == FALSE) {       /* loop for input */
+        //     res = read(fd, buf, 255); /* returns after 255 chars have been input */
+        //     buf[res] = '\0';          /* so we can printf... */
+        //     INFO("%s\n\t>%d chars received\n", buf, res);
+        //     if (buf[0] == 'z' && res <= 2)
+        //         STOP = TRUE;
+        //     LOG("\techoing back... ");
+        //     res = write(fd, buf, res);  // echoes back received message
+        //     LOG("%d chars sent\n", res);
+        // }
+
+        /*
+        O ciclo WHILE deve ser alterado de modo a respeitar o indicado no guião
+        */
+
+        tcsetattr(fd, TCSANOW, &oldtio);
+        close(fd);
+        return 0;
     }
-
-    /*
-    Open serial port device for reading and writing and not as controlling tty
-    because we don't want to get killed if linenoise sends CTRL-C.
-    */
-
-    fd = open(argv[1], O_RDWR | O_NOCTTY);
-    if (fd < 0) {
-        perror(argv[1]);
-        exit(-1);
-    }
-
-    sleep(1);
-    if (tcgetattr(fd, &oldtio) == -1) { /* save current port settings */
-        perror("tcgetattr");
-        exit(-1);
-    }
-
-    bzero(&newtio, sizeof(newtio));
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-    newtio.c_iflag = IGNPAR;
-    newtio.c_oflag = 0;
-
-    /* set input mode (non-canonical, no echo,...) */
-    newtio.c_lflag = 0;
-
-    // VTIME = 0.1 para esperar 100 ms por read
-    // VMIN = 0 para não ficar bloqueado à espera de um caractere
-    newtio.c_cc[VTIME] = 0.1; /* inter-character timer unused */
-    newtio.c_cc[VMIN] = 0;    /* blocking read until 5 chars received */
-
-    /*
-    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
-    leitura do(s) próximo(s) caracter(es)
-    */
-
-    tcflush(fd, TCIOFLUSH);
-
-    if (tcsetattr(fd, TCSANOW, &newtio) == -1) {
-        perror("tcsetattr");
-        exit(-1);
-    }
-
-    printf("New termios structure set.\n");
-    printf("Waiting on SET transmission.\n");
-
-    for (int tries = 1;; tries++) {
-        LOG("Awaiting SET/UA connection. Tries: %d\n", tries);
-        set_connection(fd);
-        ua_connection(fd);
-        break;
-    }
-
-    LOG("SET/UA successfull\n");
-
-    while (STOP == FALSE) {       /* loop for input */
-        res = read(fd, buf, 255); /* returns after 255 chars have been input */
-        buf[res] = '\0';          /* so we can printf... */
-        INFO("%s\n\t>%d chars received\n", buf, res);
-        if (buf[0] == 'z' && res <= 2)
-            STOP = TRUE;
-        LOG("\techoing back... ");
-        res = write(fd, buf, res);  // echoes back received message
-        LOG("%d chars sent\n", res);
-    }
-
-    /*
-    O ciclo WHILE deve ser alterado de modo a respeitar o indicado no guião
-    */
-
-    tcsetattr(fd, TCSANOW, &oldtio);
-    close(fd);
-    return 0;
-}
 
 #undef BUF_SIZE
