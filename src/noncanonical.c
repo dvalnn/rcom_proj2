@@ -20,9 +20,6 @@
 
 volatile int STOP = FALSE;
 
-// Global Variables for alarms
-// int alarm_flag = 1, alarm_counter = 1;
-
 #pragma region SET_Con
 
 #define F 0x5C
@@ -35,7 +32,9 @@ typedef enum states {
     st_FLAG_RCV,
     st_A_RCV,
     st_C_RCV,
-    st_BCC_OK,
+    st_BCC1_OK,
+    st_INFO_RCV,
+    st_BCC2_OK,
     st_STOP
 } states;
 
@@ -70,14 +69,14 @@ states state_update(states cur_state, unsigned char rcved) {
         case st_C_RCV:
             ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", BCC, (unsigned int)(rcved & 0xFF));
             if (rcved == BCC)
-                new_state = st_BCC_OK;
+                new_state = st_BCC1_OK;
             else if (rcved == F)
                 new_state = st_FLAG_RCV;
             else
                 new_state = st_START;
             break;
 
-        case st_BCC_OK:
+        case st_BCC1_OK:
             ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", F, (unsigned int)(rcved & 0xFF));
             if (rcved == F)
                 new_state = st_STOP;

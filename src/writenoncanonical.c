@@ -181,11 +181,10 @@ bool establish_connection(int fd) {
 }
 
 int main(int argc, char** argv) {
-    int fd;
     // int fd, c, res;
-    struct termios oldtio, newtio;
-    // char buf[BUF_SIZE];
     //  int i, sum = 0, speed = 0;
+    int fd;
+    struct termios oldtio, newtio;
 
     (void)signal(SIGALRM, on_alarm);
 
@@ -240,26 +239,27 @@ int main(int argc, char** argv) {
     }
 
     INFO("SET/UA successfull.\n");
-    // INFO("Waiting for user input. [max 255 chars]\n");
+    INFO("Waiting for user input. [max 255 chars]\n");
 
-    // int bytes_read = 0;
-    // while (scanf(" %255[^\n]%n", buf, &bytes_read) == 1) {
-    //     if (bytes_read > 0) {
-    //         int bytes_written = write(fd, buf, bytes_read);
-    //         LOG("\t>%d bytes sent\n", bytes_written);
+    int bytes_read = 0;
+    char buf[BUF_SIZE];
+    while (scanf(" %255[^\n]%n", buf, &bytes_read) == 1) {
+        if (bytes_read > 0) {
+            int bytes_written = write(fd, buf, bytes_read);
+            LOG("\t>%d bytes sent\n", bytes_written);
 
-    //         if (buf[0] == 'z' && bytes_written <= 2) {
-    //             break;
-    //         }
-    //         bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
-    //         LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
-    //     }
-    // }
+            if (buf[0] == 'z' && bytes_written <= 2) {
+                break;
+            }
+            bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
+            LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
+        }
+    }
 
-    // if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
-    //     perror("tcsetattr");
-    //     exit(-1);
-    // }
+    if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
+        perror("tcsetattr");
+        exit(-1);
+    }
 
     close(fd);
     return 0;
