@@ -15,8 +15,8 @@ LIB = lib
 INCLUDE = include
 BIN = bin
 
-RECEIVER = noncanonical.c
-TRANSMITTER = writenoncanonical.c
+RECEIVER = main/noncanonical.c
+TRANSMITTER = main/writenoncanonical.c
 BUILDEXTENS = out
 
 SERIAL1 = /dev/ttyS10
@@ -27,10 +27,10 @@ SERIAL2 = /dev/ttyS11
 
 all: $(BIN)/receiver.$(BUILDEXTENS) $(BIN)/transmitter.$(BUILDEXTENS)
 
-$(BIN)/receiver.$(BUILDEXTENS): $(SRC)/$(RECEIVER) #$(LIB)/*.c
+$(BIN)/receiver.$(BUILDEXTENS): $(RECEIVER) $(SRC)/*.c
 	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
 
-$(BIN)/transmitter.$(BUILDEXTENS): $(SRC)/$(TRANSMITTER) #$(LIB)/*.c
+$(BIN)/transmitter.$(BUILDEXTENS): $(TRANSMITTER) $(SRC)/*.c
 	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
 
 .PHONY: clean
