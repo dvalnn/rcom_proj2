@@ -16,11 +16,6 @@
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
-void ua_message(int fd) {
-    uchar ua[] = UA(A1);
-    write(fd, ua, sizeof ua);
-}
-
 void on_alarm()  // atende alarme
 {
     ALARM("Alarm Interrupt Triggered\n");
@@ -44,11 +39,12 @@ int main(int argc, char** argv) {
 
     LOG("Awaiting SET/UA connection.\n");
 
-    uchar m_type[] = SET(A1);
+    uchar request[] = SET(A1);
+    uchar response[] = UA(A1);
     while (true) {
-        if (read_incomming(fd, m_type)) {
+        if (read_incomming(fd, request)) {
             LOG("SET successfull\n");
-            ua_message(fd);
+            write(fd, response, sizeof response);
             break;
         }
     }
