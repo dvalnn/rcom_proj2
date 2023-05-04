@@ -14,13 +14,17 @@
 
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
-#define FALSE 0
-#define TRUE 1
 
-volatile int STOP = FALSE;
+volatile int STOP = false;
 
 #define BUF_SIZE 255
 #define MAX_RETRIES 5
+
+void serial_config(int fd, struct termios* oldtio);
+
+int serial_open(char* serial_port);
+
+void serial_close(int fd, struct termios* configs);
 
 #pragma region Alarm_Cont
 
@@ -181,34 +185,56 @@ bool establish_connection(int fd) {
 }
 
 int main(int argc, char** argv) {
-    // int fd, c, res;
-    //  int i, sum = 0, speed = 0;
-    int fd;
-    struct termios oldtio, newtio;
-
-    (void)signal(SIGALRM, on_alarm);
-
     if (argc < 2) {
         INFO("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
         exit(1);
     }
 
-    /*
-    Open serial port device for reading and writing and not as controlling tty
-    because we don't want to get killed if linenoise sends CTRL-C.
-    */
+    struct termios oldtio;
 
-    fd = open(argv[1], O_RDWR | O_NOCTTY);
-    if (fd < 0) {
-        perror(argv[1]);
+    int fd = serial_open(argv[1]);
+    serial_config(fd, &oldtio);
+
+    if (!establish_connection(fd)) {
+        INFO("Failed to establish serial port connection.\n");
         exit(-1);
     }
 
+    INFO("SET/UA successfull.\n");
+    INFO("Waiting for user input. [max 255 chars]\n");
+
+    int bytes_read = 0;
+    char buf[BUF_SIZE];
+    while (scanf(" %254[^\n]%n", buf, &bytes_read) == 1) {
+        if (bytes_read > 0) {
+            int bytes_written = write(fd, buf, bytes_read);
+            LOG("\t>%d bytes sent\n", bytes_written);
+
+            if (buf[0] == 'z' && bytes_written <= 2) {
+                break;
+            }
+            bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
+            LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
+        }
+    }
+
+    serial_close(fd, &oldtio);
+
+    return 0;
+}
+
+void serial_config(int fd, struct termios* oldtio) {
+    struct termios newtio;
+
+    LOG("SAVING terminal settings");
+
     sleep(1);
-    if (tcgetattr(fd, &oldtio) == -1) { /* save current port settings */
+    if (tcgetattr(fd, oldtio) == -1) { /* save current port settings */
         perror("tcgetattr");
         exit(-1);
     }
+
+    LOG("Settings saved");
 
     bzero(&newtio, sizeof(newtio));
     newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
@@ -227,42 +253,33 @@ int main(int argc, char** argv) {
     tcflush(fd, TCIOFLUSH);
 
     if (tcsetattr(fd, TCSANOW, &newtio) == -1) {
-        perror("tcsetattr");
+        ERROR("tcsetattr");
         exit(-1);
     }
 
     LOG("New termios structure set.\n");
+}
 
-    if (!establish_connection(fd)) {
-        INFO("Failed to establish serial port connection.\n");
-        return -1;
+int serial_open(char* serial_port) {
+    int fd;
+
+    (void)signal(SIGALRM, on_alarm);
+
+    fd = open(serial_port, O_RDWR | O_NOCTTY);
+
+    if (fd < 0) {
+        ERROR("%s", serial_port);
+        exit(-1);
     }
 
-    INFO("SET/UA successfull.\n");
-    INFO("Waiting for user input. [max 255 chars]\n");
+    return fd;
+}
 
-    int bytes_read = 0;
-    char buf[BUF_SIZE];
-    while (scanf(" %255[^\n]%n", buf, &bytes_read) == 1) {
-        if (bytes_read > 0) {
-            int bytes_written = write(fd, buf, bytes_read);
-            LOG("\t>%d bytes sent\n", bytes_written);
-
-            if (buf[0] == 'z' && bytes_written <= 2) {
-                break;
-            }
-            bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
-            LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
-        }
-    }
-
-    if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
+void serial_close(int fd, struct termios* configs) {
+    if (tcsetattr(fd, TCSANOW, configs) == -1) {
         perror("tcsetattr");
         exit(-1);
     }
 
     close(fd);
-    return 0;
 }
-
-#undef BUF_SIZE
