@@ -6,11 +6,11 @@
 #define A1 0x01  //* For commands sent by the Transmitter and Answers sent by the Receiver
 #define A3 0x03  //* For commands sent by the Receiver and Answers sent by the Transmitter
 
-#define C_SET 0b000011
-#define C_DISC 0b001011
-#define C_UA 0b000111
-#define C_RR(X) ((X << 5) | 0b000001)
-#define C_REJ(X) ((X << 5) | 0b000101)
+#define C_SET 0b00000011
+#define C_DISC 0b00001011
+#define C_UA 0b00000111
+#define C_RR(X) ((X << 5) | 0b00000001)
+#define C_REJ(X) ((X << 5) | 0b00000101)
 
 #define SET(A) \
     { F, A, C_SET, A ^ C_SET, F }
