@@ -8,24 +8,21 @@
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #include "log.h"
+#include "suFrames.h"
 
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
-#define FALSE 0
-#define TRUE 1
 
 #define BUF_SIZE 255
 
-volatile int STOP = FALSE;
+int serial_open(char* serial_port);
+void serial_config(int fd, struct termios* oldtio);
+void serial_close(int fd, struct termios* configs);
 
 #pragma region SET_Con
-
-#define F 0x5C
-#define A 0x01
-#define C 0x03
-#define BCC (A ^ C)
 
 typedef enum states {
     st_START,
@@ -40,45 +37,46 @@ typedef enum states {
 
 states state_update(states cur_state, unsigned char rcved) {
     states new_state = cur_state;
+    uChar set_msg[] = SET(A1);
 
     switch (cur_state) {
         case st_START:
-            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", F, (unsigned int)(rcved & 0xFF));
-            if (rcved == F)
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", set_msg[0], (unsigned int)(rcved & 0xFF));
+            if (rcved == set_msg[0])
                 new_state = st_FLAG_RCV;
             break;
 
         case st_FLAG_RCV:
-            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", A, (unsigned int)(rcved & 0xFF));
-            if (rcved == A)
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", set_msg[1], (unsigned int)(rcved & 0xFF));
+            if (rcved == set_msg[1])
                 new_state = st_A_RCV;
-            else if (rcved != F)
+            else if (rcved != set_msg[0])
                 new_state = st_START;
             break;
 
         case st_A_RCV:
-            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", C, (unsigned int)(rcved & 0xFF));
-            if (rcved == C)
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", set_msg[2], (unsigned int)(rcved & 0xFF));
+            if (rcved == set_msg[2])
                 new_state = st_C_RCV;
-            else if (rcved == F)
+            else if (rcved == set_msg[0])
                 new_state = st_FLAG_RCV;
             else
                 new_state = st_START;
             break;
 
         case st_C_RCV:
-            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", BCC, (unsigned int)(rcved & 0xFF));
-            if (rcved == BCC)
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", set_msg[3], (unsigned int)(rcved & 0xFF));
+            if (rcved == set_msg[3])
                 new_state = st_BCC1_OK;
-            else if (rcved == F)
+            else if (rcved == set_msg[0])
                 new_state = st_FLAG_RCV;
             else
                 new_state = st_START;
             break;
 
         case st_BCC1_OK:
-            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", F, (unsigned int)(rcved & 0xFF));
-            if (rcved == F)
+            ALARM("\t>Expected: 0x%.02x; Received 0x%.02x\n", set_msg[4], (unsigned int)(rcved & 0xFF));
+            if (rcved == set_msg[4])
                 new_state = st_STOP;
             else
                 new_state = st_START;
@@ -154,65 +152,22 @@ void on_alarm()  // atende alarme
 #pragma endregion
 
 int main(int argc, char** argv) {
-    // int fd, c, res;
-    int fd;  //, res;
-    struct termios oldtio, newtio;
-    // char buf[255];
-
-    (void)signal(SIGALRM, on_alarm);
-
     if (argc < 2) {
         printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
         exit(1);
     }
 
-    /*
-    Open serial port device for reading and writing and not as controlling tty
-    because we don't want to get killed if linenoise sends CTRL-C.
-    */
+    (void)signal(SIGALRM, on_alarm);
 
-    fd = open(argv[1], O_RDWR | O_NOCTTY);
-    if (fd < 0) {
-        perror(argv[1]);
-        exit(-1);
-    }
+    struct termios oldtio;
+    int fd = serial_open(argv[1]);
+    serial_config(fd, &oldtio);
 
-    sleep(1);
-    if (tcgetattr(fd, &oldtio) == -1) { /* save current port settings */
-        perror("tcgetattr");
-        exit(-1);
-    }
+    INFO("New termios structure set.\n");
 
-    bzero(&newtio, sizeof(newtio));
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-    newtio.c_iflag = IGNPAR;
-    newtio.c_oflag = 0;
+    LOG("Awaiting SET/UA connection.\n");
 
-    /* set input mode (non-canonical, no echo,...) */
-    newtio.c_lflag = 0;
-
-    // VTIME = 1 para esperar 100 ms por read
-    //* VTIME - Timeout in deciseconds for noncanonical read.
-    //* VMIN - Minimum number of characters for noncanonical read.
-    newtio.c_cc[VTIME] = 1;
-    newtio.c_cc[VMIN] = 0;
-
-    /*
-    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
-    leitura do(s) próximo(s) caracter(es)
-    */
-
-    tcflush(fd, TCIOFLUSH);
-
-    if (tcsetattr(fd, TCSANOW, &newtio) == -1) {
-        perror("tcsetattr");
-        exit(-1);
-    }
-
-    printf("New termios structure set.\n");
-    LOG("Awaiting SET/UA connection.");
-
-    while (1) {
+    while (true) {
         if (read_incomming(fd)) {
             LOG("SET successfull\n");
             ua_message(fd);
@@ -231,13 +186,68 @@ int main(int argc, char** argv) {
     //     LOG("%d chars sent\n", res);
     // }
 
-    /*
-    O ciclo WHILE deve ser alterado de modo a respeitar o indicado no guião
-    */
+    serial_close(fd, &oldtio);
 
-    tcsetattr(fd, TCSANOW, &oldtio);
-    close(fd);
     return 0;
 }
 
-#undef BUF_SIZE
+int serial_open(char* serial_port) {
+    int fd;
+
+    (void)signal(SIGALRM, on_alarm);
+
+    fd = open(serial_port, O_RDWR | O_NOCTTY);
+
+    if (fd < 0) {
+        ERROR("%s", serial_port);
+        exit(-1);
+    }
+
+    return fd;
+}
+
+void serial_config(int fd, struct termios* oldtio) {
+    struct termios newtio;
+
+    LOG("SAVING terminal settings\n");
+
+    sleep(1);
+    if (tcgetattr(fd, oldtio) == -1) { /* save current port settings */
+        perror("tcgetattr");
+        exit(-1);
+    }
+
+    LOG("Settings saved\n");
+
+    bzero(&newtio, sizeof(newtio));
+    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+    newtio.c_iflag = IGNPAR;
+    newtio.c_oflag = 0;
+
+    /* set input mode (non-canonical, no echo,...) */
+    newtio.c_lflag = 0;
+
+    //* VTIME - Timeout in deciseconds for noncanonical read.
+    //* VMIN - Minimum number of characters for noncanonical read.
+    // VTIME = 1 para esperar 100 ms por read
+    newtio.c_cc[VTIME] = 1;
+    newtio.c_cc[VMIN] = 0;
+
+    tcflush(fd, TCIOFLUSH);
+
+    if (tcsetattr(fd, TCSANOW, &newtio) == -1) {
+        ERROR("tcsetattr");
+        exit(-1);
+    }
+
+    LOG("New termios structure set.\n");
+}
+
+void serial_close(int fd, struct termios* configs) {
+    if (tcsetattr(fd, TCSANOW, configs) == -1) {
+        perror("tcsetattr");
+        exit(-1);
+    }
+
+    close(fd);
+}

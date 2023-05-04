@@ -11,32 +11,23 @@
 #include <stdbool.h>
 
 #include "log.h"
+#include "suFrames.h"
 
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
-volatile int STOP = false;
-
 #define BUF_SIZE 255
 #define MAX_RETRIES 5
 
-void serial_config(int fd, struct termios* oldtio);
+bool alarm_flag = false;
 
-int serial_open(char* serial_port);
+void serial_config(int fd, struct termios* oldtio);
 
 void serial_close(int fd, struct termios* configs);
 
-#pragma region Alarm_Cont
+int serial_open(char* serial_port);
 
-bool retry_con = false;
-
-void on_alarm()  // atende alarme
-{
-    ALARM("Alarm Interrupt Triggered\n");
-    retry_con = true;
-}
-
-#pragma endregion
+void on_alarm();  // atende alarme
 
 #pragma region SET_Con
 
@@ -166,18 +157,18 @@ bool establish_connection(int fd) {
 
         alarm(3);
 
-        while (!retry_con) {
+        while (!alarm_flag) {
             if (ua_connection(fd)) {
                 alarm(0);
                 return true;
             }
         }
 
-        if (!retry_con)
+        if (!alarm_flag)
             break;
 
         ALARM("SET/UA Connection failed.\n\t- Trying again in 2 seconds.\n");
-        retry_con = false;
+        alarm_flag = false;
         sleep(2);
     }
 
@@ -189,6 +180,8 @@ int main(int argc, char** argv) {
         INFO("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
         exit(1);
     }
+
+    (void)signal(SIGALRM, on_alarm);
 
     struct termios oldtio;
 
@@ -203,24 +196,30 @@ int main(int argc, char** argv) {
     INFO("SET/UA successfull.\n");
     INFO("Waiting for user input. [max 255 chars]\n");
 
-    int bytes_read = 0;
-    char buf[BUF_SIZE];
-    while (scanf(" %254[^\n]%n", buf, &bytes_read) == 1) {
-        if (bytes_read > 0) {
-            int bytes_written = write(fd, buf, bytes_read);
-            LOG("\t>%d bytes sent\n", bytes_written);
+    // int bytes_read = 0;
+    // char buf[BUF_SIZE];
+    // while (scanf(" %254[^\n]%n", buf, &bytes_read) == 1) {
+    //     if (bytes_read > 0) {
+    //         int bytes_written = write(fd, buf, bytes_read);
+    //         LOG("\t>%d bytes sent\n", bytes_written);
 
-            if (buf[0] == 'z' && bytes_written <= 2) {
-                break;
-            }
-            bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
-            LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
-        }
-    }
+    //         if (buf[0] == 'z' && bytes_written <= 2) {
+    //             break;
+    //         }
+    //         bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
+    //         LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
+    //     }
+    // }
 
     serial_close(fd, &oldtio);
 
     return 0;
+}
+
+void on_alarm()  // atende alarme
+{
+    ALARM("Alarm Interrupt Triggered\n");
+    alarm_flag = true;
 }
 
 void serial_config(int fd, struct termios* oldtio) {
@@ -244,9 +243,9 @@ void serial_config(int fd, struct termios* oldtio) {
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    // VTIME = 1 para esperar 100 ms por read
     //* VTIME - Timeout in deciseconds for noncanonical read.
     //* VMIN - Minimum number of characters for noncanonical read.
+    // VTIME = 1 para esperar 100 ms por read
     newtio.c_cc[VTIME] = 1;
     newtio.c_cc[VMIN] = 0;
 
