@@ -1,5 +1,4 @@
 /*Non-Canonical Input Processing*/
-
 #include <fcntl.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -22,14 +21,11 @@ bool alarm_flag = false;
 
 void on_alarm();  // atende alarme
 
-bool establish_connection(int fd) {
-    uchar command[] = SET(A1);
-    uchar response[] = UA(A1);
-
+bool send_command(int fd, uchar* command, int clen, uchar* response) {
     for (int tries = 1; tries < MAX_RETRIES; tries++) {
         LOG("Attemping SET/UA connection.\n\t- Attempt number: %d\n", tries);
 
-        write(fd, command, sizeof command);
+        write(fd, command, clen);
         alarm(3);
         while (!alarm_flag) {
             if (read_incomming(fd, response)) {
@@ -41,7 +37,7 @@ bool establish_connection(int fd) {
         if (!alarm_flag)
             break;
 
-        ALARM("SET/UA Connection failed.\n\t- Trying again in 2 seconds.\n");
+        ALARM("Command timed out.\n\t- Trying again in 2 seconds.\n");
         alarm_flag = false;
         sleep(2);
     }
@@ -62,12 +58,15 @@ int main(int argc, char** argv) {
     int fd = serial_open(argv[1]);
     serial_config(fd, &oldtio);
 
-    if (!establish_connection(fd)) {
+    uchar command[] = SET(A1);
+    uchar response[] = UA(A1);
+
+    if (!send_command(fd, command, sizeof command, response)) {
         INFO("Failed to establish serial port connection.\n");
         exit(-1);
     }
 
-    INFO("SET/UA successfull.\n");
+    INFO("Connection established\n");
 
     // INFO("Waiting for user input. [max 255 chars]\n");
 
