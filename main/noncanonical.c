@@ -34,15 +34,13 @@ int main(int argc, char** argv) {
     struct termios oldtio;
     int fd = serial_open(argv[1]);
     serial_config(fd, &oldtio);
-
     INFO("New termios structure set.\n");
 
     LOG("Awaiting SET/UA connection.\n");
-
-    uchar request[] = SET(A1);
+    uchar command[] = SET(A1);
     uchar response[] = UA(A1);
     while (true) {
-        if (read_incomming(fd, request)) {
+        if (read_incomming(fd, command)) {
             LOG("SET successfull\n");
             write(fd, response, sizeof response);
             break;

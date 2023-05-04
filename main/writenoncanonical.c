@@ -21,19 +21,18 @@
 bool alarm_flag = false;
 
 void on_alarm();  // atende alarme
-void set_connection(int fd);
 
 bool establish_connection(int fd) {
-    uchar m_type[] = UA(A1);
+    uchar command[] = SET(A1);
+    uchar response[] = UA(A1);
 
     for (int tries = 1; tries < MAX_RETRIES; tries++) {
         LOG("Attemping SET/UA connection.\n\t- Attempt number: %d\n", tries);
-        set_connection(fd);
 
+        write(fd, command, sizeof command);
         alarm(3);
-
         while (!alarm_flag) {
-            if (read_incomming(fd, m_type)) {
+            if (read_incomming(fd, response)) {
                 alarm(0);
                 return true;
             }
@@ -96,9 +95,4 @@ void on_alarm()  // atende alarme
 {
     ALARM("Alarm Interrupt Triggered\n");
     alarm_flag = true;
-}
-
-void set_connection(int fd) {
-    uchar set[] = SET(A1);
-    write(fd, set, sizeof(set));
 }
