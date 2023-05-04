@@ -10,9 +10,9 @@
 #include <sys/types.h>
 #include <termios.h>
 
+#include "frames.h"
 #include "log.h"
 #include "serial.h"
-#include "suFrames.h"
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
