@@ -31,20 +31,10 @@ void on_alarm();  // atende alarme
 
 #pragma region SET_Con
 
-#define F 0x5C
-#define A 0x01
-#define C 0x03
-#define BCC (A ^ C)
-
 void set_connection(int fd) {
-    unsigned char set[] = {F, A, C, BCC, F};
+    uChar set[] = SET(A1);
     write(fd, set, sizeof(set));
 }
-
-#undef F
-#undef A
-#undef C
-#undef BCC
 
 #pragma endregion
 
