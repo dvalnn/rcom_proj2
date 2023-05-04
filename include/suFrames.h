@@ -1,5 +1,5 @@
-#ifndef _CONST_H_
-#define _CONST_H_
+#ifndef _SU_FRAMES_H_
+#define _SU_FRAMES_H_
 
 #define F 0x5C
 
@@ -27,6 +27,8 @@
 #define REJ(A, X) \
     { F, A, C_REJ(X), A ^ C_REJ(X), F }
 
-typedef unsigned char uChar;
+typedef unsigned char uchar;
 
-#endif  // _CONST_H_
+int read_incomming(int fd, uchar* msg_type);
+
+#endif  // _SU_FRAMES_H
