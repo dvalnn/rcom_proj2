@@ -16,17 +16,31 @@
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
 #define MAX_RETRIES 5
+#define ALARM_TIMEOUT_SEC 3
+#define RETRY_INTERVAL_SEC 3
 
 bool alarm_flag = false;
 
-void on_alarm();  // atende alarme
+typedef enum p_phases {
+    establishment,
+    data_transfer,
+    termination
+} p_phases;
+
+void on_alarm()  // atende alarme
+{
+    ALARM("Alarm Interrupt Triggered\n");
+    alarm_flag = true;
+}
 
 bool send_command(int fd, uchar* command, int clen, uchar* response) {
     for (int tries = 1; tries < MAX_RETRIES; tries++) {
-        LOG("Attemping SET/UA connection.\n\t- Attempt number: %d\n", tries);
-
+        LOG("Sending command.\n\t- Attempt number: %d\n", tries);
         write(fd, command, clen);
-        alarm(3);
+        if (!response)
+            return true;
+
+        alarm(ALARM_TIMEOUT_SEC);
         while (!alarm_flag) {
             if (read_incomming(fd, response)) {
                 alarm(0);
@@ -37,12 +51,70 @@ bool send_command(int fd, uchar* command, int clen, uchar* response) {
         if (!alarm_flag)
             break;
 
-        ALARM("Command timed out.\n\t- Trying again in 2 seconds.\n");
+        ALARM("Command timed out.\n\t- Trying again in 3 seconds.\n");
         alarm_flag = false;
-        sleep(2);
+        sleep(RETRY_INTERVAL_SEC);
     }
 
     return false;
+}
+
+void write_from_kb(int fd) {
+    INFO("Waiting for user input. [max 255 chars]\n\t> ");
+
+    int bytes_read = 0;
+    char buf[255];
+    while (scanf(" %254[^\n]%n", buf, &bytes_read) == 1) {
+        if (bytes_read > 0) {
+            int bytes_written = write(fd, buf, bytes_read);
+            LOG("\t>%d bytes sent\n", bytes_written);
+
+            if (buf[0] == 'z' && bytes_written <= 2) {
+                break;
+            }
+        }
+    }
+}
+
+void p_phase_handler(int fd) {
+    p_phases current = establishment;
+
+    while (true) {
+        switch (current) {
+            case establishment: {
+                uchar command[] = SET(A1);
+                uchar response[] = UA(A1);
+
+                if (!send_command(fd, command, sizeof(command), response)) {
+                    ERROR("Failed to establish serial port connection.\n");
+                    return;
+                }
+                INFO("Serial port connection established.\n");
+                current = data_transfer;
+                break;
+            }
+
+            // TODO: implementar tramas de informação e bit stuffing
+            case data_transfer: {
+                write_from_kb(fd);
+                current = termination;
+                break;
+            }
+
+            case termination: {
+                uchar command[] = DISC(A1);
+                uchar response[] = DISC(A3);
+                uchar acknowledge[] = UA(A3);
+                if (!send_command(fd, command, sizeof(command), response)) {
+                    ERROR("Failed to terminate connection on receiver end\n");
+                    return;
+                }
+                // TODO: Implementar isto melhor
+                send_command(fd, acknowledge, sizeof(acknowledge), NULL);
+                return;
+            }
+        }
+    }
 }
 
 int main(int argc, char** argv) {
@@ -58,40 +130,9 @@ int main(int argc, char** argv) {
     int fd = serial_open(argv[1]);
     serial_config(fd, &oldtio);
 
-    uchar command[] = SET(A1);
-    uchar response[] = UA(A1);
-
-    if (!send_command(fd, command, sizeof command, response)) {
-        INFO("Failed to establish serial port connection.\n");
-        exit(-1);
-    }
-
-    INFO("Connection established\n");
-
-    // INFO("Waiting for user input. [max 255 chars]\n");
-
-    // int bytes_read = 0;
-    // char buf[BUF_SIZE];
-    // while (scanf(" %254[^\n]%n", buf, &bytes_read) == 1) {
-    //     if (bytes_read > 0) {
-    //         int bytes_written = write(fd, buf, bytes_read);
-    //         LOG("\t>%d bytes sent\n", bytes_written);
-
-    //         if (buf[0] == 'z' && bytes_written <= 2) {
-    //             break;
-    //         }
-    //         bytes_read = read(fd, buf, bytes_written);  // read receiver echo message
-    //         LOG("\t>Echo received (%d chars): %s\n", bytes_read, buf);
-    //     }
-    // }
+    p_phase_handler(fd);
 
     serial_close(fd, &oldtio);
-
+    INFO("Serial connection closed\n");
     return 0;
-}
-
-void on_alarm()  // atende alarme
-{
-    ALARM("Alarm Interrupt Triggered\n");
-    alarm_flag = true;
 }

@@ -66,14 +66,13 @@ su_states state_update(su_states cur_state, uchar rcved, uchar* msg_type) {
 }
 
 int parse_message(unsigned char* message, int message_length, uchar* msg_type) {
-    su_states cur_state = st_START;
-    LOG("\n");
-    LOG("--Detection START--\n");
+    INFO("%s\n\t>%d chars received\n", message, message_length);
 
+    su_states cur_state = st_START;
     for (int i = 0; i < message_length; i++) {
-        LOG("\tChar received: 0x%.02x (position %d)\n", (unsigned int)(message[i] & 0xff), i);
+        ALARM("\tChar received: 0x%.02x (position %d)\n", (unsigned int)(message[i] & 0xff), i);
         cur_state = state_update(cur_state, message[i], msg_type);
-        LOG("\tCurrent state: %d\n", cur_state);
+        ALARM("\tCurrent state: %d\n", cur_state);
         if (cur_state == st_STOP)
             break;
     }
