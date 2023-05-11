@@ -15,23 +15,44 @@
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
-#define MAX_RETRIES 5
+#define MAX_RETRIES_DEFAULT 3
 #define ALARM_TIMEOUT_SEC 3
 #define RETRY_INTERVAL_SEC 3
 
 bool alarm_flag = false;
 
+#define TIME_OUT_AFTER_N_TRIES(FUNC, N_TRIES, RET_BOOL)                  \
+    {                                                                    \
+        RET_BOOL = false;                                                \
+        for (int i = 0; i < N_TRIES; i++) {                              \
+            alarm_flag = false;                                          \
+            alarm(ALARM_TIMEOUT_SEC);                                    \
+            while (!alarm_flag) {                                        \
+                if (FUNC) {                                              \
+                    alarm(0);                                            \
+                    RET_BOOL = true;                                     \
+                    break;                                               \
+                }                                                        \
+            }                                                            \
+            if (!alarm_flag)                                             \
+                break;                                                   \
+            ALERT(                                                       \
+                "Command timed out.\n\t- Trying again in %d seconds.\n", \
+                RETRY_INTERVAL_SEC);                                     \
+            sleep(RETRY_INTERVAL_SEC);                                   \
+        }                                                                \
+    }
+
+void alarm_handler(int signum)  // atende alarme
+{
+    ALERT("Alarm Interrupt Triggered with code %d\n", signum);
+    alarm_flag = true;
+}
 typedef enum p_phases {
     establishment,
     data_transfer,
     termination,
 } p_phases;
-
-void on_alarm()  // atende alarme
-{
-    WARNING("Alarm Interrupt Triggered\n");
-    alarm_flag = true;
-}
 
 void p_phase_handler(int fd) {
     p_phases current = establishment;
@@ -64,10 +85,11 @@ void p_phase_handler(int fd) {
             case termination: {
                 uchar response[] = DISC(A3);
                 uchar acknowledge[] = UA(A3);
+                bool success = false;
 
-                send_command(fd, response, sizeof response);
-
-                if (!read_incomming(fd, acknowledge)) {
+                write(fd, response, sizeof response);
+                TIME_OUT_AFTER_N_TRIES(read_incomming(fd, acknowledge), MAX_RETRIES_DEFAULT, success);
+                if (!success) {
                     ERROR("Failed to received disconnect acknowledgemnet\n");
                     return;
                 }
@@ -82,7 +104,7 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    (void)signal(SIGALRM, on_alarm);
+    (void)signal(SIGALRM, alarm_handler);
 
     struct termios oldtio;
     int fd = serial_open(argv[1]);

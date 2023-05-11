@@ -40,16 +40,16 @@
 
 #if _DEBUG >= 3
 /**
- * Prints the formatted message with level ALARM
+ * Prints the formatted message with level ALERT
  */
-#define ALARM(...) _LOG("ALARM", __VA_ARGS__)
+#define ALERT(...) _LOG("ALERT", __VA_ARGS__)
 #else
-#define ALARM(...)
+#define ALERT(...)
 #endif
 #else
 #define LOG(...)
 #define INFO(...)
-#define WARNING(...)
+#define ALERT(...)
 #endif
 
 /**

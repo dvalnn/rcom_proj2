@@ -2,6 +2,8 @@
 #define _SU_FRAMES_H_
 
 #define F 0x5C
+#define ESC 0x5d
+#define ESC_SEQ (OCT)(OCT ^ 0x20)
 
 #define A1 0x01  //* For commands sent by the Transmitter and Answers sent by the Receiver
 #define A3 0x03  //* For commands sent by the Receiver and Answers sent by the Transmitter
@@ -30,6 +32,5 @@
 typedef unsigned char uchar;
 
 int read_incomming(int fd, uchar* msg_type);
-void send_command(int fd, uchar* command, int clen);
 
 #endif  // _SU_FRAMES_H

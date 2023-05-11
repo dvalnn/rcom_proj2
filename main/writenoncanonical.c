@@ -16,15 +16,37 @@
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
-#define MAX_RETRIES_DEFAULT 5
+#define MAX_RETRIES_DEFAULT 3
 #define ALARM_TIMEOUT_SEC 3
 #define RETRY_INTERVAL_SEC 3
 
 bool alarm_flag = false;
 
-void on_alarm()  // atende alarme
+#define TIME_OUT_AFTER_N_TRIES(FUNC, N_TRIES, RET_BOOL)                  \
+    {                                                                    \
+        RET_BOOL = false;                                                \
+        for (int i = 0; i < N_TRIES; i++) {                              \
+            alarm_flag = false;                                          \
+            alarm(ALARM_TIMEOUT_SEC);                                    \
+            while (!alarm_flag) {                                        \
+                if (FUNC) {                                              \
+                    alarm(0);                                            \
+                    RET_BOOL = true;                                     \
+                    break;                                               \
+                }                                                        \
+            }                                                            \
+            if (!alarm_flag)                                             \
+                break;                                                   \
+            ALERT(                                                       \
+                "Command timed out.\n\t- Trying again in %d seconds.\n", \
+                RETRY_INTERVAL_SEC);                                     \
+            sleep(RETRY_INTERVAL_SEC);                                   \
+        }                                                                \
+    }
+
+void alarm_handler(int signum)  // atende alarme
 {
-    WARNING("Alarm Interrupt Triggered\n");
+    ALERT("Alarm Interrupt Triggered with code %d\n", signum);
     alarm_flag = true;
 }
 
@@ -59,8 +81,11 @@ void p_phase_handler(int fd) {
             case establishment: {
                 uchar command[] = SET(A1);
                 uchar response[] = UA(A1);
+                bool success = false;
 
-                if (!send_command(fd, command, sizeof(command), response)) {
+                write(fd, command, sizeof command);
+                TIME_OUT_AFTER_N_TRIES(read_incomming(fd, response), MAX_RETRIES_DEFAULT, success);
+                if (!success) {
                     ERROR("Failed to establish serial port connection.\n");
                     return;
                 }
@@ -72,7 +97,7 @@ void p_phase_handler(int fd) {
             // TODO: implementar tramas de informação e bit stuffing
             case data_transfer: {
                 // write_from_kb(fd);
-                // current = termination;
+                current = termination;
                 break;
             }
 
@@ -80,12 +105,17 @@ void p_phase_handler(int fd) {
                 uchar command[] = DISC(A1);
                 uchar response[] = DISC(A3);
                 uchar acknowledge[] = UA(A3);
-                if (!send_command(fd, command, sizeof(command), response)) {
+                bool success = false;
+
+                write(fd, command, sizeof(command));
+                TIME_OUT_AFTER_N_TRIES(read_incomming(fd, response), MAX_RETRIES_DEFAULT, success);
+                if (!success) {
                     ERROR("Failed to terminate connection on receiver end\n");
                     return;
                 }
+
                 // TODO: Implementar isto melhor
-                send_command(fd, acknowledge, sizeof(acknowledge), NULL);
+                write(fd, acknowledge, acknowledge);
                 return;
             }
         }
@@ -98,7 +128,7 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    (void)signal(SIGALRM, on_alarm);
+    (void)signal(SIGALRM, alarm_handler);
 
     struct termios oldtio;
 
