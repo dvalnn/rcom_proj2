@@ -1,6 +1,9 @@
 #include "frames.h"
 #include "log.h"
 
+#include <fcntl.h>
+#include <sys/stat.h>
+
 #define BUF_SIZE 255
 
 typedef enum su_states {
@@ -12,7 +15,7 @@ typedef enum su_states {
     st_STOP
 } su_states;
 
-su_states state_update(su_states cur_state, uchar rcved, uchar* msg_type) {
+su_states header_state_machine(su_states cur_state, uchar rcved, uchar* msg_type) {
     su_states new_state = cur_state;
 
     switch (cur_state) {
@@ -65,29 +68,65 @@ su_states state_update(su_states cur_state, uchar rcved, uchar* msg_type) {
     return new_state;
 }
 
-int parse_message(unsigned char* message, int message_length, uchar* msg_type) {
-    INFO("%s\n\t>%d chars received\n", message, message_length);
-
+int verify_header(unsigned char* message, int message_length, uchar* msg_type, int is_info) {
+    LOG("%s\n\t>%d chars received\n", message, message_length);
     su_states cur_state = st_START;
+
     for (int i = 0; i < message_length; i++) {
         ALERT("\tChar received: 0x%.02x (position %d)\n", (unsigned int)(message[i] & 0xff), i);
-        cur_state = state_update(cur_state, message[i], msg_type);
+        cur_state = header_state_machine(cur_state, message[i], msg_type);
         ALERT("\tCurrent state: %d\n", cur_state);
         if (cur_state == st_STOP)
-            break;
+            return 1;
+        if (cur_state == st_BCC1_OK && is_info)
+            return 1;
     }
 
-    return cur_state == st_STOP;
+    return 0;
 }
 
 int read_incomming(int fd, uchar* msg_type) {
     unsigned char buf[BUF_SIZE];
-    int lenght = read(fd, buf, sizeof(buf));
-    if (lenght) {
-        LOG("Received %d characters\n", lenght);
-        return parse_message(buf, lenght, msg_type);
+    int length = read(fd, buf, sizeof(buf));
+    if (length) {
+        LOG("Received %d characters\n", length);
+        return verify_header(buf, length, msg_type, 0);
     }
     return 0;
+}
+
+int verify_tail(uchar* buf, int length) {
+    // TODO: descobrir o que raio é para fazer c/ o BCC2
+    return buf[length - 1] == F;
+}
+
+int read_info(int fd, int id) {
+    unsigned char buf[BUF_SIZE];
+    int length = read(fd, buf, sizeof buf);
+
+    if (!length)
+        return 0;
+
+    // TODO: fazer de-stuffing
+
+    uchar disconnect[] = DISC(A1);
+    uchar info[] = INFO_MSG(A1, id);
+    if (verify_header(buf, length, disconnect, 0))
+        return 2;
+
+    if (verify_header(buf, length, info, 1) && verify_tail(buf, length)) {
+        int file = creat("Output.txt", O_WRONLY | O_CREAT);
+        if (!file) {
+            ERROR("Output.txt not created\n");
+            return -2;
+        }
+
+        write(file, buf, length);
+        close(file);
+        return 1;
+    }
+
+    return -1;
 }
 
 #undef BUF_SIZE

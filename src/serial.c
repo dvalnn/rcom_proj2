@@ -16,7 +16,7 @@ int serial_open(char* serial_port) {
 void serial_config(int fd, struct termios* oldtio) {
     struct termios newtio;
 
-    LOG("SAVING terminal settings");
+    LOG("SAVING terminal settings\n");
 
     sleep(1);
     if (tcgetattr(fd, oldtio) == -1) { /* save current port settings */
@@ -24,7 +24,7 @@ void serial_config(int fd, struct termios* oldtio) {
         exit(-1);
     }
 
-    LOG("Settings saved");
+    LOG("Settings saved\n");
 
     bzero(&newtio, sizeof(newtio));
     newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;

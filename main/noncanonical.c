@@ -28,7 +28,7 @@ bool alarm_flag = false;
             alarm_flag = false;                                          \
             alarm(ALARM_TIMEOUT_SEC);                                    \
             while (!alarm_flag) {                                        \
-                if (FUNC) {                                              \
+                if ((FUNC)) {                                            \
                     alarm(0);                                            \
                     RET_BOOL = true;                                     \
                     break;                                               \
@@ -56,6 +56,7 @@ typedef enum p_phases {
 
 void p_phase_handler(int fd) {
     p_phases current = establishment;
+    int id = 0;
 
     while (true) {
         switch (current) {
@@ -64,7 +65,7 @@ void p_phase_handler(int fd) {
                 uchar response[] = UA(A1);
 
                 if (read_incomming(fd, command)) {
-                    LOG("Connection Established\nStarting Data Transfer\n");
+                    LOG("Connection Established\n\tStarting Data Transfer\n");
                     write(fd, response, sizeof response);
                     current = data_transfer;
                 }
@@ -73,12 +74,40 @@ void p_phase_handler(int fd) {
 
             // TODO: Implementar frames de informação e bit de-stufffing
             case data_transfer: {
-                uchar term_command[] = DISC(A1);
+                int retval = read_info(fd, id);
 
-                if (read_incomming(fd, term_command)) {
-                    INFO("Data Transfer Complete\n");
-                    current = termination;
+                switch (retval) {
+                    case 2: {
+                        uchar term_command[] = DISC(A1);
+                        write(fd, term_command, sizeof term_command);
+                        current = termination;
+                    }
+
+                    case 1: {
+                        id = !id;
+                        uchar response[] = RR(A1, id);
+                        write(fd, response, sizeof response);
+                        break;
+                    }
+
+                    case 0:
+                        break;
+
+                    case -1:
+                        uchar rejection[] = REJ(A3, id);
+                        write(fd, rejection, sizeof rejection);
+                        INFO("Rejecting segment\n");
+                        break;
+
+                    case -2:
+                        ERROR("Cannot Open Output File\n");
+                        return;
+
+                    default:
+                        ERROR("Unexpected value for retval\n");
+                        return;
                 }
+
                 break;
             }
 
