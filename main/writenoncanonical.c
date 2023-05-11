@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <termios.h>
+#include <unistd.h>
 
 #include "frames.h"
 #include "log.h"
@@ -70,14 +71,18 @@ void write_info(int fd, uchar* buf, int size, int id) {
     uchar msg_buf[255];
     uchar header[] = INFO_MSG(A1, id);
 
+    LOG("%s\n", buf);
+
     for (int i = 0; i < sizeof header; i++)
         msg_buf[i] = header[i];
     for (int i = sizeof header; i < size; i++)
-        msg_buf[i] = buf[i];
+        msg_buf[i] = buf[i - (sizeof header)];
 
-    msg_buf[size - 3] = F;
     msg_buf[size - 2] = F;
-    msg_buf[size - 1] = '\0';
+    msg_buf[size - 1] = F;
+    // msg_buf[size - 1] = '\0';
+
+    LOG("%s\n", msg_buf);
 
     write(fd, msg_buf, sizeof msg_buf);
 }
@@ -88,10 +93,10 @@ void send_info(int fd) {
         ERROR("Failed to open file 'wywh.txt'\n");
         return;
     }
+    lseek(file, SEEK_SET, 0);
 
     uchar buf[245];
     int id = 0;
-
     while (true) {  //? Tou thonking == cooking == Mr. Walter no way
         bool success = false;
         uchar response[] = RR(A1, !id);
@@ -102,12 +107,12 @@ void send_info(int fd) {
 
         for (int i = 0; i < MAX_RETRIES_DEFAULT; i++) {
             write_info(fd, buf, size, id);
+            sleep(RETRY_INTERVAL_SEC);
             TIME_OUT(read_incomming(fd, response), success);
             if (success)
                 break;
             if (i < MAX_RETRIES_DEFAULT - 1) {
                 LOG("Retrying in %d seconds\n", RETRY_INTERVAL_SEC);
-                sleep(RETRY_INTERVAL_SEC);
             }
         }
 
@@ -116,7 +121,7 @@ void send_info(int fd) {
 
         id = !id;
     }
-
+    lseek(file, SEEK_SET, 0);
     close(file);
     return;
 }
@@ -133,6 +138,7 @@ void p_phase_handler(int fd) {
 
                 for (int i = 0; i < MAX_RETRIES_DEFAULT; i++) {
                     write(fd, command, sizeof command);
+                    // sleep(RETRY_INTERVAL_SEC);
                     TIME_OUT(read_incomming(fd, response), success);
                     if (success)
                         break;
@@ -160,8 +166,8 @@ void p_phase_handler(int fd) {
                 uchar acknowledge[] = UA(A3);
                 bool success = false;
 
-                write(fd, command, sizeof(command));
                 for (int i = 0; i < MAX_RETRIES_DEFAULT; i++) {
+                    write(fd, command, sizeof(command));
                     TIME_OUT(read_incomming(fd, response), success);
                     if (success)
                         break;
@@ -175,7 +181,7 @@ void p_phase_handler(int fd) {
                 }
 
                 // TODO: Implementar isto melhor
-                write(fd, acknowledge, acknowledge);
+                write(fd, acknowledge, sizeof acknowledge);
                 return;
             }
         }

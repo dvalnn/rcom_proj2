@@ -17,30 +17,23 @@
 
 #define MAX_RETRIES_DEFAULT 3
 #define ALARM_TIMEOUT_SEC 3
-#define RETRY_INTERVAL_SEC 3
+#define RETRY_INTERVAL_SEC 1
 
 bool alarm_flag = false;
 
-#define TIME_OUT_AFTER_N_TRIES(FUNC, N_TRIES, RET_BOOL)                  \
-    {                                                                    \
-        RET_BOOL = false;                                                \
-        for (int i = 0; i < N_TRIES; i++) {                              \
-            alarm_flag = false;                                          \
-            alarm(ALARM_TIMEOUT_SEC);                                    \
-            while (!alarm_flag) {                                        \
-                if ((FUNC)) {                                            \
-                    alarm(0);                                            \
-                    RET_BOOL = true;                                     \
-                    break;                                               \
-                }                                                        \
-            }                                                            \
-            if (!alarm_flag)                                             \
-                break;                                                   \
-            ALERT(                                                       \
-                "Command timed out.\n\t- Trying again in %d seconds.\n", \
-                RETRY_INTERVAL_SEC);                                     \
-            sleep(RETRY_INTERVAL_SEC);                                   \
-        }                                                                \
+#define TIME_OUT(FUNC, RET_VAL)        \
+    {                                  \
+        alarm_flag = false;            \
+        alarm(ALARM_TIMEOUT_SEC);      \
+        while (!alarm_flag) {          \
+            RET_VAL = FUNC;            \
+            if (RET_VAL) {             \
+                alarm(0);              \
+                break;                 \
+            }                          \
+        }                              \
+                                       \
+        ALERT("Command timed out.\n"); \
     }
 
 void alarm_handler(int signum)  // atende alarme
@@ -116,8 +109,15 @@ void p_phase_handler(int fd) {
                 uchar acknowledge[] = UA(A3);
                 bool success = false;
 
-                write(fd, response, sizeof response);
-                TIME_OUT_AFTER_N_TRIES(read_incomming(fd, acknowledge), MAX_RETRIES_DEFAULT, success);
+                for (int i = 0; i < MAX_RETRIES_DEFAULT; i++) {
+                    write(fd, response, sizeof response);
+                    sleep(RETRY_INTERVAL_SEC);
+                    TIME_OUT(read_incomming(fd, acknowledge), success);
+                    if (success)
+                        break;
+                    LOG("Retrying in %d seconds\n", RETRY_INTERVAL_SEC);
+                }
+
                 if (!success) {
                     ERROR("Failed to received disconnect acknowledgemnet\n");
                     return;

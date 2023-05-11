@@ -111,17 +111,24 @@ int read_info(int fd, int id) {
 
     uchar disconnect[] = DISC(A1);
     uchar info[] = INFO_MSG(A1, id);
-    if (verify_header(buf, length, disconnect, 0))
+    if (verify_header(buf, length, disconnect, 0)) {
+        LOG("Received disconnect\n");
         return 2;
+    }
 
     if (verify_header(buf, length, info, 1) && verify_tail(buf, length)) {
-        int file = creat("Output.txt", O_WRONLY | O_CREAT);
+        int file = creat("output.txt", O_WRONLY | O_CREAT | O_APPEND);
         if (!file) {
             ERROR("Output.txt not created\n");
             return -2;
         }
 
-        write(file, buf, length);
+        LOG("%s\n", buf);
+
+        uchar* start = &buf[4];
+        buf[length - 2] = '\0';
+
+        write(file, start, length);
         close(file);
         return 1;
     }
