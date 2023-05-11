@@ -18,30 +18,23 @@
 
 #define MAX_RETRIES_DEFAULT 3
 #define ALARM_TIMEOUT_SEC 3
-#define RETRY_INTERVAL_SEC 3
+#define RETRY_INTERVAL_SEC 1
 
 bool alarm_flag = false;
 
-#define TIME_OUT_AFTER_N_TRIES(FUNC, N_TRIES, RET_BOOL)                  \
-    {                                                                    \
-        RET_BOOL = false;                                                \
-        for (int i = 0; i < N_TRIES; i++) {                              \
-            alarm_flag = false;                                          \
-            alarm(ALARM_TIMEOUT_SEC);                                    \
-            while (!alarm_flag) {                                        \
-                if (FUNC) {                                              \
-                    alarm(0);                                            \
-                    RET_BOOL = true;                                     \
-                    break;                                               \
-                }                                                        \
-            }                                                            \
-            if (!alarm_flag)                                             \
-                break;                                                   \
-            ALERT(                                                       \
-                "Command timed out.\n\t- Trying again in %d seconds.\n", \
-                RETRY_INTERVAL_SEC);                                     \
-            sleep(RETRY_INTERVAL_SEC);                                   \
-        }                                                                \
+#define TIME_OUT(FUNC, RET_VAL)        \
+    {                                  \
+        alarm_flag = false;            \
+        alarm(ALARM_TIMEOUT_SEC);      \
+        while (!alarm_flag) {          \
+            RET_VAL = FUNC;            \
+            if (RET_VAL) {             \
+                alarm(0);              \
+                break;                 \
+            }                          \
+        }                              \
+                                       \
+        ALERT("Command timed out.\n"); \
     }
 
 void alarm_handler(int signum)  // atende alarme
@@ -73,6 +66,61 @@ void write_from_kb(int fd) {
     }
 }
 
+void write_info(int fd, uchar* buf, int size, int id) {
+    uchar msg_buf[255];
+    uchar header[] = INFO_MSG(A1, id);
+
+    for (int i = 0; i < sizeof header; i++)
+        msg_buf[i] = header[i];
+    for (int i = sizeof header; i < size; i++)
+        msg_buf[i] = buf[i];
+
+    msg_buf[size - 3] = F;
+    msg_buf[size - 2] = F;
+    msg_buf[size - 1] = '\0';
+
+    write(fd, msg_buf, sizeof msg_buf);
+}
+
+void send_info(int fd) {
+    int file = open("wywh.txt", O_RDONLY);  //! :Blushed:
+    if (!file) {
+        ERROR("Failed to open file 'wywh.txt'\n");
+        return;
+    }
+
+    uchar buf[245];
+    int id = 0;
+
+    while (true) {  //? Tou thonking == cooking == Mr. Walter no way
+        bool success = false;
+        uchar response[] = RR(A1, !id);
+
+        int size = read(file, buf, sizeof buf);
+        if (!size)
+            break;
+
+        for (int i = 0; i < MAX_RETRIES_DEFAULT; i++) {
+            write_info(fd, buf, size, id);
+            TIME_OUT(read_incomming(fd, response), success);
+            if (success)
+                break;
+            if (i < MAX_RETRIES_DEFAULT - 1) {
+                LOG("Retrying in %d seconds\n", RETRY_INTERVAL_SEC);
+                sleep(RETRY_INTERVAL_SEC);
+            }
+        }
+
+        if (!success)
+            break;
+
+        id = !id;
+    }
+
+    close(file);
+    return;
+}
+
 void p_phase_handler(int fd) {
     p_phases current = establishment;
 
@@ -81,24 +129,29 @@ void p_phase_handler(int fd) {
             case establishment: {
                 uchar command[] = SET(A1);
                 uchar response[] = UA(A1);
-                bool success = false;
+                int success = false;
 
-                write(fd, command, sizeof command);
-                TIME_OUT_AFTER_N_TRIES(read_incomming(fd, response), MAX_RETRIES_DEFAULT, success);
+                for (int i = 0; i < MAX_RETRIES_DEFAULT; i++) {
+                    write(fd, command, sizeof command);
+                    TIME_OUT(read_incomming(fd, response), success);
+                    if (success)
+                        break;
+                }
+
                 if (!success) {
                     ERROR("Failed to establish serial port connection.\n");
                     return;
                 }
+
                 INFO("Serial port connection established.\n");
                 current = data_transfer;
                 break;
             }
 
-            // TODO: implementar tramas de informação e bit stuffing
+            // TODO: implementar bit stuffing
             case data_transfer: {
-                // write_from_kb(fd);
+                send_info(fd);
                 current = termination;
-                break;
             }
 
             case termination: {
@@ -108,7 +161,14 @@ void p_phase_handler(int fd) {
                 bool success = false;
 
                 write(fd, command, sizeof(command));
-                TIME_OUT_AFTER_N_TRIES(read_incomming(fd, response), MAX_RETRIES_DEFAULT, success);
+                for (int i = 0; i < MAX_RETRIES_DEFAULT; i++) {
+                    TIME_OUT(read_incomming(fd, response), success);
+                    if (success)
+                        break;
+                    LOG("Trying again in %d seconds\n", RETRY_INTERVAL_SEC);
+                    sleep(RETRY_INTERVAL_SEC);
+                }
+
                 if (!success) {
                     ERROR("Failed to terminate connection on receiver end\n");
                     return;

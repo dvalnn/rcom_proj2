@@ -97,7 +97,7 @@ int read_incomming(int fd, uchar* msg_type) {
 
 int verify_tail(uchar* buf, int length) {
     // TODO: descobrir o que raio é para fazer c/ o BCC2
-    return buf[length - 1] == F;
+    return buf[length - 2] == F;
 }
 
 int read_info(int fd, int id) {
