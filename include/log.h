@@ -49,7 +49,7 @@
 #else
 #define LOG(...)
 #define INFO(...)
-#define ALARM(...)
+#define WARNING(...)
 #endif
 
 /**

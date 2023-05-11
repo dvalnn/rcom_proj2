@@ -29,34 +29,8 @@ typedef enum p_phases {
 
 void on_alarm()  // atende alarme
 {
-    ALARM("Alarm Interrupt Triggered\n");
+    WARNING("Alarm Interrupt Triggered\n");
     alarm_flag = true;
-}
-
-bool send_command(int fd, uchar* command, int clen, uchar* response) {
-    for (int tries = 1; tries < MAX_RETRIES; tries++) {
-        LOG("Sending command.\n\t- Attempt number: %d\n", tries);
-        write(fd, command, clen);
-        if (!response)
-            return true;
-
-        alarm(ALARM_TIMEOUT_SEC);
-        while (!alarm_flag) {
-            if (read_incomming(fd, response)) {
-                alarm(0);
-                return true;
-            }
-        }
-
-        if (!alarm_flag)
-            break;
-
-        ALARM("Command timed out.\n\t- Trying again in 3 seconds.\n");
-        alarm_flag = false;
-        sleep(RETRY_INTERVAL_SEC);
-    }
-
-    return false;
 }
 
 void p_phase_handler(int fd) {
@@ -78,9 +52,9 @@ void p_phase_handler(int fd) {
 
             // TODO: Implementar frames de informação e bit de-stufffing
             case data_transfer: {
-                uchar command[] = DISC(A1);
+                uchar term_command[] = DISC(A1);
 
-                if (read_incomming(fd, command)) {
+                if (read_incomming(fd, term_command)) {
                     INFO("Data Transfer Complete\n");
                     current = termination;
                 }
@@ -91,7 +65,9 @@ void p_phase_handler(int fd) {
                 uchar response[] = DISC(A3);
                 uchar acknowledge[] = UA(A3);
 
-                if (!send_command(fd, response, sizeof response, acknowledge)) {
+                send_command(fd, response, sizeof response);
+
+                if (!read_incomming(fd, acknowledge)) {
                     ERROR("Failed to received disconnect acknowledgemnet\n");
                     return;
                 }

@@ -30,5 +30,6 @@
 typedef unsigned char uchar;
 
 int read_incomming(int fd, uchar* msg_type);
+void send_command(int fd, uchar* command, int clen);
 
 #endif  // _SU_FRAMES_H
