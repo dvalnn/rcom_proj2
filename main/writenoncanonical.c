@@ -13,6 +13,7 @@
 
 #include "frames.h"
 #include "log.h"
+#include "sds.h"
 #include "serial.h"
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
@@ -21,6 +22,8 @@
 #define ALARM_TIMEOUT_SEC 3
 #define RETRY_INTERVAL_SEC 1
 
+#define READ_BUFFER_SIZE 256
+/*
 bool alarm_flag = false;
 
 #define TIME_OUT(FUNC, RET_VAL)        \
@@ -187,6 +190,25 @@ void p_phase_handler(int fd) {
         }
     }
 }
+*/
+bool handshake_handler(int fd) {
+    sds set_msg, set_msg_repr;
+    uchar format_buf[] = SET;
+    // uchar recv_buf[READ_BUFFER_SIZE];
+
+    set_msg = sdsnewlen(format_buf, sizeof format_buf);
+    set_msg_repr = sdsempty();
+    set_msg_repr = sdscatrepr(set_msg_repr, set_msg, sdslen(set_msg));
+
+    for (int i = 0; i < sdslen(set_msg); i++)
+        write(fd, &set_msg[i], sizeof set_msg[i]);
+    printf("Set message repr: %s\n", set_msg_repr);
+
+    sdsfree(set_msg);
+    sdsfree(set_msg_repr);
+
+    return true;
+}//
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -194,14 +216,15 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    (void)signal(SIGALRM, alarm_handler);
+    // (void)signal(SIGALRM, alarm_handler);
 
     struct termios oldtio;
 
     int fd = serial_open(argv[1]);
     serial_config(fd, &oldtio);
 
-    p_phase_handler(fd);
+    handshake_handler(fd);
+    // p_phase_handler(fd);
 
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");

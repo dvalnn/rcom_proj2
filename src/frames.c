@@ -2,79 +2,142 @@
 #include "log.h"
 
 #include <fcntl.h>
+#include <stdbool.h>
 #include <sys/stat.h>
 
-#define BUF_SIZE 255
+frame_type control_byte_handler(uchar byte) {
+    switch (byte) {
+        case C_SET:
+            return SET_FRAME;
+        case C_UA:
+            return UA_FRAME;
+        case C_RR(0):
+            return RR0_FRAME;
+        case C_RR(1):
+            return RR1_FRAME;
+        case C_REJ(0):
+            return REJ0_FRAME;
+        case C_REJ(1):
+            return REJ1_FRAME;
+        case C_NS(0):
+            return INFO0_FRAME;
+        case C_NS(1):
+            return INFO1_FRAME;
 
-typedef enum su_states {
-    st_START,
-    st_FLAG_RCV,
-    st_A_RCV,
-    st_C_RCV,
-    st_BCC1_OK,
-    st_STOP
-} su_states;
+        default:
+            return INVALID_FRAME;
+    }
+}
 
-su_states header_state_machine(su_states cur_state, uchar rcved, uchar* msg_type) {
-    su_states new_state = cur_state;
+bool bcc1_handler(uchar byte, frame_type ftype) {
+    switch (ftype) {
+        case SET_FRAME:
+            return byte == (A1 ^ C_SET);
 
-    switch (cur_state) {
-        case st_START:
-            ALERT("\t>Expected: 0x%.02x; Received 0x%.02x\n", msg_type[0], (unsigned int)(rcved & 0xFF));
-            if (rcved == msg_type[0])
-                new_state = st_FLAG_RCV;
+        case UA_FRAME:
+            return byte == (A1 ^ C_UA);
+        case DISC_FRAME:
+            return byte == (A1 ^ C_DISC);
+
+        case RR0_FRAME:
+            return byte == (A1 ^ C_RR(0));
+
+        case RR1_FRAME:
+            return byte == (A1 ^ C_RR(1));
+
+        case REJ0_FRAME:
+            return byte == (A1 ^ C_REJ(0));
+
+        case REJ1_FRAME:
+            return byte == (A1 ^ C_REJ(1));
+
+        case INFO0_FRAME:
+            return byte == (A1 ^ C_NS(0));
+
+        case INFO1_FRAME:
+            return byte == (A1 ^ C_NS(1));
+
+        default:
+            return false;
+    }
+}
+
+frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved) {
+    frame_state new_state = cur_state;
+    frame_type candidate = *ftype;
+
+    ALERT("Received 0x%.02x\n", (unsigned int)(rcved & 0xFF));
+    LOG("Candidate frame: %d\n", candidate);
+
+    switch (new_state) {
+        case frame_START:
+            if (rcved == F)
+                new_state = frame_FLAG1;
             break;
 
-        case st_FLAG_RCV:
-            ALERT("\t>Expected: 0x%.02x; Received 0x%.02x\n", msg_type[1], (unsigned int)(rcved & 0xFF));
-            if (rcved == msg_type[1])
-                new_state = st_A_RCV;
-            else if (rcved != msg_type[0])
-                new_state = st_START;
+        case frame_FLAG1:
+            if (rcved == A1)
+                new_state = frame_A;
+            else if (rcved != F)
+                new_state = frame_START;
             break;
 
-        case st_A_RCV:
-            ALERT("\t>Expected: 0x%.02x; Received 0x%.02x\n", msg_type[2], (unsigned int)(rcved & 0xFF));
-            if (rcved == msg_type[2])
-                new_state = st_C_RCV;
-            else if (rcved == msg_type[0])
-                new_state = st_FLAG_RCV;
+        case frame_A:
+            if (rcved == F) {
+                new_state = frame_FLAG1;
+                break;
+            }
+
+            candidate = control_byte_handler(rcved);
+
+            if (candidate == INVALID_FRAME)
+                new_state = frame_START;
             else
-                new_state = st_START;
+                new_state = frame_C;
             break;
 
-        case st_C_RCV:
-            ALERT("\t>Expected: 0x%.02x; Received 0x%.02x\n", msg_type[3], (unsigned int)(rcved & 0xFF));
-            if (rcved == msg_type[3])
-                new_state = st_BCC1_OK;
-            else if (rcved == msg_type[0])
-                new_state = st_FLAG_RCV;
+        case frame_C:
+            if (rcved == F) {
+                new_state = frame_FLAG1;
+                break;
+            }
+            if (bcc1_handler(rcved, candidate))
+                new_state = frame_BCC1_OK;
             else
-                new_state = st_START;
+                new_state = frame_START;
             break;
 
-        case st_BCC1_OK:
-            ALERT("\t>Expected: 0x%.02x; Received 0x%.02x\n", msg_type[4], (unsigned int)(rcved & 0xFF));
-            if (rcved == msg_type[4])
-                new_state = st_STOP;
-            else
-                new_state = st_START;
+        case frame_BCC1_OK:
+            if (rcved == F && !(candidate == INFO0_FRAME || candidate == INFO1_FRAME)) {
+                new_state = frame_VALID;
+            } else if ((candidate == INFO0_FRAME || candidate == INFO1_FRAME))
+                new_state = frame_INFO;
             break;
 
-        case st_STOP:
+        case frame_INFO:
+            if (rcved == F)
+                new_state = frame_VALID;
+            break;
+
+        case frame_BCC2_OK:
+            // TODO: Handler p/ bcc2
+            break;
+
+        case frame_VALID:
             break;
     }
 
+    *ftype = candidate;
     return new_state;
 }
-
+/*
 int verify_header(unsigned char* message, int message_length, uchar* msg_type, int is_info) {
     LOG("%s\n\t>%d chars received\n", message, message_length);
-    su_states cur_state = st_START;
+    frame_state cur_state = frame_START;
 
     for (int i = 0; i < message_length; i++) {
         ALERT("\tChar received: 0x%.02x (position %d)\n", (unsigned int)(message[i] & 0xff), i);
-        cur_state = header_state_machine(cur_state, message[i], msg_type);
+        cur_state = frame_handler(cur_state, message[i], msg_type);
         ALERT("\tCurrent state: %d\n", cur_state);
         if (cur_state == st_STOP)
             return 1;
@@ -135,5 +198,4 @@ int read_info(int fd, int id) {
 
     return -1;
 }
-
-#undef BUF_SIZE
+*/
