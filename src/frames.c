@@ -8,53 +8,53 @@
 frame_type control_byte_handler(uchar byte) {
     switch (byte) {
         case C_SET:
-            return SET_FRAME;
+            return ft_SET;
         case C_UA:
-            return UA_FRAME;
+            return ft_UA;
         case C_RR(0):
-            return RR0_FRAME;
+            return ft_RR0;
         case C_RR(1):
-            return RR1_FRAME;
+            return ft_RR1;
         case C_REJ(0):
-            return REJ0_FRAME;
+            return ft_REJ0;
         case C_REJ(1):
-            return REJ1_FRAME;
+            return ft_REJ1;
         case C_NS(0):
-            return INFO0_FRAME;
+            return ft_INFO0;
         case C_NS(1):
-            return INFO1_FRAME;
+            return ft_INFO1;
 
         default:
-            return INVALID_FRAME;
+            return ft_INVALID;
     }
 }
 
 bool bcc1_handler(uchar byte, frame_type ftype) {
     switch (ftype) {
-        case SET_FRAME:
+        case ft_SET:
             return byte == (A1 ^ C_SET);
 
-        case UA_FRAME:
+        case ft_UA:
             return byte == (A1 ^ C_UA);
-        case DISC_FRAME:
+        case ft_DISC:
             return byte == (A1 ^ C_DISC);
 
-        case RR0_FRAME:
+        case ft_RR0:
             return byte == (A1 ^ C_RR(0));
 
-        case RR1_FRAME:
+        case ft_RR1:
             return byte == (A1 ^ C_RR(1));
 
-        case REJ0_FRAME:
+        case ft_REJ0:
             return byte == (A1 ^ C_REJ(0));
 
-        case REJ1_FRAME:
+        case ft_REJ1:
             return byte == (A1 ^ C_REJ(1));
 
-        case INFO0_FRAME:
+        case ft_INFO0:
             return byte == (A1 ^ C_NS(0));
 
-        case INFO1_FRAME:
+        case ft_INFO1:
             return byte == (A1 ^ C_NS(1));
 
         default:
@@ -67,63 +67,69 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
     frame_type candidate = *ftype;
 
     ALERT("Received 0x%.02x\n", (unsigned int)(rcved & 0xFF));
-    LOG("Candidate frame: %d\n", candidate);
+    ALERT("Candidate frame: %d\n", candidate);
 
     switch (new_state) {
-        case frame_START:
+        case fs_START:
             if (rcved == F)
-                new_state = frame_FLAG1;
+                new_state = fs_FLAG1;
             break;
 
-        case frame_FLAG1:
+        case fs_FLAG1:
             if (rcved == A1)
-                new_state = frame_A;
+                new_state = fs_A;
             else if (rcved != F)
-                new_state = frame_START;
+                new_state = fs_START;
             break;
 
-        case frame_A:
+        case fs_A:
             if (rcved == F) {
-                new_state = frame_FLAG1;
+                new_state = fs_FLAG1;
                 break;
             }
 
             candidate = control_byte_handler(rcved);
 
-            if (candidate == INVALID_FRAME)
-                new_state = frame_START;
+            if (candidate == ft_INVALID)
+                new_state = fs_START;
             else
-                new_state = frame_C;
+                new_state = fs_C;
             break;
 
-        case frame_C:
+        case fs_C:
             if (rcved == F) {
-                new_state = frame_FLAG1;
+                new_state = fs_FLAG1;
                 break;
             }
             if (bcc1_handler(rcved, candidate))
-                new_state = frame_BCC1_OK;
-            else
-                new_state = frame_START;
+                new_state = fs_BCC1_OK;
+            else {
+                new_state = fs_START;
+                candidate = ft_INVALID;
+            }
             break;
 
-        case frame_BCC1_OK:
-            if (rcved == F && !(candidate == INFO0_FRAME || candidate == INFO1_FRAME)) {
-                new_state = frame_VALID;
-            } else if ((candidate == INFO0_FRAME || candidate == INFO1_FRAME))
-                new_state = frame_INFO;
+        case fs_BCC1_OK:
+            if (rcved == F && !(candidate == ft_INFO0 || candidate == ft_INFO1)) {
+                new_state = fs_VALID;
+            } else if ((candidate == ft_INFO0 || candidate == ft_INFO1))
+                new_state = fs_INFO;
+            else {
+                new_state = fs_START;
+                candidate = ft_INVALID;
+            }
             break;
 
-        case frame_INFO:
+        case fs_INFO:
             if (rcved == F)
-                new_state = frame_VALID;
+                new_state = fs_VALID;
             break;
 
-        case frame_BCC2_OK:
+        case fs_BCC2_OK:
             // TODO: Handler p/ bcc2
             break;
 
-        case frame_VALID:
+        case fs_VALID:
             break;
     }
 

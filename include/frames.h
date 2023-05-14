@@ -36,27 +36,28 @@
 typedef unsigned char uchar;
 
 typedef enum _frame_type {
-    INVALID_FRAME,
-    SET_FRAME,
-    UA_FRAME,
-    DISC_FRAME,
-    RR0_FRAME,
-    RR1_FRAME,
-    REJ0_FRAME,
-    REJ1_FRAME,
-    INFO0_FRAME,
-    INFO1_FRAME
+    ft_ANY,
+    ft_INVALID,
+    ft_SET,
+    ft_UA,
+    ft_DISC,
+    ft_RR0,
+    ft_RR1,
+    ft_REJ0,
+    ft_REJ1,
+    ft_INFO0,
+    ft_INFO1
 } frame_type;
 
 typedef enum _frame_state {
-    frame_START,
-    frame_FLAG1,
-    frame_A,
-    frame_C,
-    frame_BCC1_OK,
-    frame_INFO,
-    frame_BCC2_OK,
-    frame_VALID,
+    fs_START,
+    fs_FLAG1,
+    fs_A,
+    fs_C,
+    fs_BCC1_OK,
+    fs_INFO,
+    fs_BCC2_OK,
+    fs_VALID
 } frame_state;
 
 frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved);

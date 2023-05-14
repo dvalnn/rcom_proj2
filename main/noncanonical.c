@@ -48,8 +48,8 @@
 bool receiver(int fd) {
     uchar rcved;
 
-    frame_type frame_atual = INVALID_FRAME, esperado = SET_FRAME;
-    frame_state estado_atual = frame_START;
+    frame_type frame_atual = ft_ANY, esperado = ft_SET;
+    frame_state estado_atual = fs_START;
 
     uchar format[] = UA;
     sds ua_msg = sdsnewlen(format, sizeof(format));
@@ -60,12 +60,12 @@ bool receiver(int fd) {
         if (!b_read)
             continue;
 
-        LOG("Estado atual: %d\n", estado_atual);
-        LOG("frame atual: %d\n", frame_atual);
+        // LOG("Estado atual: %d\n", estado_atual);
+        // LOG("frame atual: %d\n", frame_atual);
 
         estado_atual = frame_handler(estado_atual, &frame_atual, rcved);
 
-        if (frame_atual == esperado && estado_atual == frame_VALID) {
+        if (frame_atual == esperado && estado_atual == fs_VALID) {
             write(fd, ua_msg, sdslen(ua_msg));
             break;
         }

@@ -18,14 +18,16 @@
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
-#define MAX_RETRIES_DEFAULT 3
+#define MAX_RETRIES 3
 #define ALARM_TIMEOUT_SEC 3
-#define RETRY_INTERVAL_SEC 1
+#define ALARM_SLEEP_SEC 1
 
 #define READ_BUFFER_SIZE 256
-/*
-bool alarm_flag = false;
 
+bool alarm_flag = false;
+int alarm_count = 0;
+
+/*
 #define TIME_OUT(FUNC, RET_VAL)        \
     {                                  \
         alarm_flag = false;            \
@@ -40,13 +42,18 @@ bool alarm_flag = false;
                                        \
         ALERT("Command timed out.\n"); \
     }
-
+*/
 void alarm_handler(int signum)  // atende alarme
 {
-    ALERT("Alarm Interrupt Triggered with code %d\n", signum);
+    alarm_count++;
     alarm_flag = true;
+    ALERT("Alarm Interrupt Triggered with code %d\n", signum);
+    if (alarm_count < MAX_RETRIES) {
+        ALERT("Sleeping for %ds before next retry\n", ALARM_SLEEP_SEC);
+        sleep(ALARM_SLEEP_SEC);
+    }
 }
-
+/*
 typedef enum p_phases {
     establishment,
     data_transfer,
@@ -194,21 +201,64 @@ void p_phase_handler(int fd) {
 bool handshake_handler(int fd) {
     sds set_msg, set_msg_repr;
     uchar format_buf[] = SET;
-    // uchar recv_buf[READ_BUFFER_SIZE];
+    uchar rcved;
+
+    frame_type f_detected = ft_INVALID, f_expected = ft_UA;
+    frame_state fs_current = fs_START;
+
+    bool success = false;
 
     set_msg = sdsnewlen(format_buf, sizeof format_buf);
     set_msg_repr = sdsempty();
     set_msg_repr = sdscatrepr(set_msg_repr, set_msg, sdslen(set_msg));
 
-    for (int i = 0; i < sdslen(set_msg); i++)
-        write(fd, &set_msg[i], sizeof set_msg[i]);
-    printf("Set message repr: %s\n", set_msg_repr);
+    alarm_count = 0;
+
+    while (true) {
+        for (int i = 0; i < sdslen(set_msg); i++)
+            write(fd, &set_msg[i], sizeof set_msg[i]);
+
+        LOG("Set message repr: %s\n", set_msg_repr);
+        LOG("Expecting UA response (Timing out in %ds, try number %d/%d)\n", ALARM_TIMEOUT_SEC, alarm_count + 1, MAX_RETRIES);
+
+        alarm(ALARM_TIMEOUT_SEC);
+        while (true) {
+            if (alarm_flag)
+                break;
+
+            int b_read = read(fd, &rcved, sizeof(rcved));
+
+            if (!b_read)
+                continue;
+
+            // LOG("Estado atual: %d\n", estado_atual);
+            // LOG("frame atual: %d\n", frame_atual);
+
+            fs_current = frame_handler(fs_current, &f_detected, rcved);
+
+            if (f_detected == f_expected && fs_current == fs_VALID) {
+                alarm(0);
+                success = true;
+                break;
+            }
+        }
+
+        alarm_flag = false;
+        if (alarm_count == MAX_RETRIES) {
+            alarm_count = 0;
+            break;
+        }
+    }
+
+    if (success)
+        INFO("Handshake complete\n");
+    else
+        ERROR("Handshake failure - check connection\n");
 
     sdsfree(set_msg);
     sdsfree(set_msg_repr);
-
-    return true;
-}//
+    return success;
+}
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -216,7 +266,7 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    // (void)signal(SIGALRM, alarm_handler);
+    (void)signal(SIGALRM, alarm_handler);
 
     struct termios oldtio;
 
