@@ -1,6 +1,13 @@
 #ifndef _SU_FRAMES_H_
 #define _SU_FRAMES_H_
 
+#include "log.h"
+#include "sds.h"
+
+#include <fcntl.h>
+#include <stdbool.h>
+#include <sys/stat.h>
+
 #define F 0x5C
 #define ESC 0x5d
 #define ESC_SEQ(OCT) (OCT ^ 0x20)
@@ -79,6 +86,9 @@ static const char* FState_STRING[] = {FOREACH_STATE(GENERATE_STRING)};
 #undef GENERATE_STRING
 
 frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved);
+
+sds byte_stuffing(sds input);
+uchar read_byte(int fd);
 
 // int read_incomming(int fd, uchar* msg_type);
 // int read_info(int fd, int id);

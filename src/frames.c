@@ -1,9 +1,4 @@
 #include "frames.h"
-#include "log.h"
-
-#include <fcntl.h>
-#include <stdbool.h>
-#include <sys/stat.h>
 
 frame_type control_byte_handler(uchar byte) {
     switch (byte) {
@@ -66,7 +61,6 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
     frame_state new_state = cur_state;
     frame_type candidate = *ftype;
 
-    ALERT("Received 0x%.02x\n", (unsigned int)(rcved & 0xFF));
     ALERT("Candidate frame: %s\n", FType_STRING[candidate]);
     ALERT("Currente state: %s\n", FState_STRING[cur_state]);
 
@@ -136,6 +130,74 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
 
     *ftype = candidate;
     return new_state;
+}
+
+sds byte_stuffing(sds input) {
+    int ntokens;
+
+    char sep_token1[] = {ESC};
+    char join_token1[] = {ESC, ESC_SEQ(ESC)};
+
+    char sep_token2[] = {F};
+    char join_token2[] = {ESC, ESC_SEQ(F)};
+
+    sds* tokens = sdssplitlen(input, sdslen(input), sep_token1, 1, &ntokens);
+    sds pass1 = sdsjoinsds(tokens, ntokens, join_token1, sizeof join_token1);
+
+    sdsfreesplitres(tokens, ntokens);
+
+    tokens = sdssplitlen(pass1, sdslen(pass1), sep_token2, 1, &ntokens);
+    sds result = sdsjoinsds(tokens, ntokens, join_token2, sizeof join_token2);
+
+    sdsfreesplitres(tokens, ntokens);
+    sdsfree(pass1);
+
+    return result;
+}
+
+uchar byte_destuffing(uchar input) {
+    if (input == ESC)
+        return 1;
+    if (input == ESC_SEQ(F))
+        return F;
+    if (input == ESC_SEQ(ESC))
+        return ESC;
+
+    return 0;
+}
+
+uchar read_byte(int fd) {
+    uchar byte1;
+    uchar byte2;
+
+    int b_read = read(fd, &byte1, sizeof byte1);
+    if (!b_read)
+        return 0;
+
+    ALERT("Received 0x%.02x\n", (unsigned int)(byte1 & 0xFF));
+
+    if (byte_destuffing(byte1) != 1)
+        return byte1;
+
+    ALERT("Destuffing candidate - reading another byte\n");
+
+    b_read = read(fd, &byte2, sizeof byte2);
+    uchar res = byte_destuffing(byte2);
+
+    ALERT("Received 0x%.02x\n", (unsigned int)(byte2 & 0xFF));
+
+    if (!b_read || !res || res == 1) {
+        lseek(fd, -1, SEEK_CUR);
+        ALERT("\t> False Alarm - char rolled back\n");
+        return byte1;
+    }
+
+    ALERT("Destuffed 0x%.02x0x%.02x into 0x%.02x\n",
+          (unsigned int)(byte1 & 0xFF),
+          (unsigned int)(byte2 & 0xFF),
+          (unsigned int)(res & 0xFF));
+
+    return res;
 }
 
 /*

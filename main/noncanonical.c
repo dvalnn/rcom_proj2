@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <termios.h>
+#include <unistd.h>
 
 #include "frames.h"
 #include "log.h"
@@ -53,20 +54,17 @@ bool receiver(int fd) {
 
     uchar format[] = UA;
     sds ua_msg = sdsnewlen(format, sizeof(format));
+    sds ua_stuffed = byte_stuffing(ua_msg);
 
     while (true) {
-        int b_read = read(fd, &rcved, sizeof(rcved));
-
-        if (!b_read)
+        rcved = read_byte(fd);
+        if (!rcved)
             continue;
-
-        // LOG("Estado atual: %d\n", estado_atual);
-        // LOG("frame atual: %d\n", frame_atual);
-
+            
         estado_atual = frame_handler(estado_atual, &frame_atual, rcved);
 
         if (frame_atual == esperado && estado_atual == fs_VALID) {
-            write(fd, ua_msg, sdslen(ua_msg));
+            write(fd, ua_stuffed, sdslen(ua_stuffed));
             break;
         }
     }
