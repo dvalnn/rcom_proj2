@@ -35,30 +35,48 @@
 
 typedef unsigned char uchar;
 
+#define FOREACH_STATE(STATE) \
+    STATE(fs_START)          \
+    STATE(fs_FLAG1)          \
+    STATE(fs_A)              \
+    STATE(fs_C)              \
+    STATE(fs_BCC1_OK)        \
+    STATE(fs_INFO)           \
+    STATE(fs_BCC2_OK)        \
+    STATE(fs_VALID)
+
+#define FOREACH_FRAME(FRAME) \
+    FRAME(ft_ANY)            \
+    FRAME(ft_INVALID)        \
+    FRAME(ft_SET)            \
+    FRAME(ft_UA)             \
+    FRAME(ft_DISC)           \
+    FRAME(ft_RR0)            \
+    FRAME(ft_RR1)            \
+    FRAME(ft_REJ0)           \
+    FRAME(ft_REJ1)           \
+    FRAME(ft_INFO0)          \
+    FRAME(ft_INFO1)
+
+#define GENERATE_ENUM(ENUM) ENUM,
+#define GENERATE_STRING(STRING) #STRING,
+
 typedef enum _frame_type {
-    ft_ANY,
-    ft_INVALID,
-    ft_SET,
-    ft_UA,
-    ft_DISC,
-    ft_RR0,
-    ft_RR1,
-    ft_REJ0,
-    ft_REJ1,
-    ft_INFO0,
-    ft_INFO1
+    FOREACH_FRAME(GENERATE_ENUM)
 } frame_type;
 
+static const char* FType_STRING[] = {FOREACH_FRAME(GENERATE_STRING)};
+
 typedef enum _frame_state {
-    fs_START,
-    fs_FLAG1,
-    fs_A,
-    fs_C,
-    fs_BCC1_OK,
-    fs_INFO,
-    fs_BCC2_OK,
-    fs_VALID
+    FOREACH_STATE(GENERATE_ENUM)
 } frame_state;
+
+static const char* FState_STRING[] = {FOREACH_STATE(GENERATE_STRING)};
+
+#undef FOREACH_FRAME
+#undef FOREACH_STATE
+#undef GENERATE_ENUM
+#undef GENERATE_STRING
 
 frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved);
 

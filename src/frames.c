@@ -67,7 +67,8 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
     frame_type candidate = *ftype;
 
     ALERT("Received 0x%.02x\n", (unsigned int)(rcved & 0xFF));
-    ALERT("Candidate frame: %d\n", candidate);
+    ALERT("Candidate frame: %s\n", FType_STRING[candidate]);
+    ALERT("Currente state: %s\n", FState_STRING[cur_state]);
 
     switch (new_state) {
         case fs_START:
@@ -136,6 +137,7 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
     *ftype = candidate;
     return new_state;
 }
+
 /*
 int verify_header(unsigned char* message, int message_length, uchar* msg_type, int is_info) {
     LOG("%s\n\t>%d chars received\n", message, message_length);

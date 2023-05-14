@@ -49,7 +49,7 @@ void alarm_handler(int signum)  // atende alarme
     alarm_flag = true;
     ALERT("Alarm Interrupt Triggered with code %d\n", signum);
     if (alarm_count < MAX_RETRIES) {
-        ALERT("Sleeping for %ds before next retry\n", ALARM_SLEEP_SEC);
+        ALERT("Sleeping for %ds before next retry\n\n", ALARM_SLEEP_SEC);
         sleep(ALARM_SLEEP_SEC);
     }
 }
@@ -242,6 +242,9 @@ bool handshake_handler(int fd) {
                 break;
             }
         }
+
+        if (success)
+            break;
 
         alarm_flag = false;
         if (alarm_count == MAX_RETRIES) {
