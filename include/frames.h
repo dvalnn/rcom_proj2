@@ -3,7 +3,7 @@
 
 #define F 0x5C
 #define ESC 0x5d
-#define ESC_SEQ (OCT)(OCT ^ 0x20)
+#define ESC_SEQ(OCT) (OCT ^ 0x20)
 
 #define A1 0x01  //* For commands sent by the Transmitter and Answers sent by the Receiver
 #define A3 0x03  //* For commands sent by the Receiver and Answers sent by the Transmitter

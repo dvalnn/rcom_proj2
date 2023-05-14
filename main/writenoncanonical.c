@@ -198,9 +198,31 @@ void p_phase_handler(int fd) {
     }
 }
 */
+
+sds byte_stuffing(sds input) {
+    int ntokens;
+
+    char sep_token1[] = {ESC};
+    char join_token1[] = {ESC, ESC_SEQ(ESC)};
+
+    char sep_token2[] = {F};
+    char join_token2[] = {ESC, ESC_SEQ(F)};
+
+    sds* tokens = sdssplitlen(input, sdslen(input), sep_token1, 1, &ntokens);
+    sds pass1 = sdsjoinsds(tokens, ntokens, join_token1, sizeof join_token1);
+
+    sdsfreesplitres(tokens, ntokens);
+
+    tokens = sdssplitlen(pass1, sdslen(pass1), sep_token2, 1, &ntokens);
+    sds result = sdsjoinsds(tokens, ntokens, join_token2, sizeof join_token2);
+
+    sdsfreesplitres(tokens, ntokens);
+    sdsfree(pass1);
+
+    return result;
+}
+
 bool handshake_handler(int fd) {
-    sds set_msg, set_msg_repr;
-    uchar format_buf[] = SET;
     uchar rcved;
 
     frame_type f_detected = ft_INVALID, f_expected = ft_UA;
@@ -208,17 +230,26 @@ bool handshake_handler(int fd) {
 
     bool success = false;
 
-    set_msg = sdsnewlen(format_buf, sizeof format_buf);
-    set_msg_repr = sdsempty();
-    set_msg_repr = sdscatrepr(set_msg_repr, set_msg, sdslen(set_msg));
+    uchar format_buf[] = SET;
+
+    sds set = sdsnewlen(format_buf, sizeof format_buf);
+    sds set_stuffed = byte_stuffing(set);
+    sds set_repr = sdsempty();
+    sds set_stuffed_repr = sdsempty();
+
+    set_repr = sdscatrepr(set_repr, set, sdslen(set));
+    set_stuffed_repr = sdscatrepr(set_stuffed_repr, set_stuffed, sdslen(set_stuffed));
+
+    printf("\t> Set REPR %s <\n", set_repr);
+    printf("\t> Set STUFFED REPR %s <\n", set_stuffed_repr);
 
     alarm_count = 0;
 
     while (true) {
-        for (int i = 0; i < sdslen(set_msg); i++)
-            write(fd, &set_msg[i], sizeof set_msg[i]);
+        for (int i = 0; i < sdslen(set); i++)
+            write(fd, &set[i], sizeof set[i]);
 
-        LOG("Set message repr: %s\n", set_msg_repr);
+        LOG("Set message repr: %s\n", set_repr);
         LOG("Expecting UA response (Timing out in %ds, try number %d/%d)\n", ALARM_TIMEOUT_SEC, alarm_count + 1, MAX_RETRIES);
 
         alarm(ALARM_TIMEOUT_SEC);
@@ -258,8 +289,11 @@ bool handshake_handler(int fd) {
     else
         ERROR("Handshake failure - check connection\n");
 
-    sdsfree(set_msg);
-    sdsfree(set_msg_repr);
+    sdsfree(set);
+    sdsfree(set_repr);
+    sdsfree(set_stuffed);
+    sdsfree(set_stuffed_repr);
+
     return success;
 }
 
