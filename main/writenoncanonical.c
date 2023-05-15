@@ -55,7 +55,7 @@ void alarm_handler(int signum)  // atende alarme
     }
 }
 
-bool handshake_handler(int fd) {
+bool llopen(int fd) {
     uchar rcved;
 
     frame_type ft_detected = ft_ANY, f_expected = ft_UA;
@@ -133,7 +133,13 @@ int main(int argc, char** argv) {
     int fd = serial_open(argv[1]);
     serial_config(fd, &oldtio);
 
-    handshake_handler(fd);
+    if (!llopen(fd)) {
+        serial_close(fd, &oldtio);
+        INFO("Serial connection closed\n");
+        return -1;
+    }
+    // llopen -> llwrite -> llread -> llclose
+    // TODO llread/llwrite/llclose
 
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");
