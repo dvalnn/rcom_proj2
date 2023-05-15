@@ -16,8 +16,8 @@
 #define A3 0x03  //* For commands sent by the Receiver and Answers sent by the Transmitter
 
 #define C_SET 0b00000011
-#define C_DISC 0b00001011
 #define C_UA 0b00000111
+#define C_DISC 0b00001011
 #define C_RR(X) ((X << 5) | 0b00000001)
 #define C_REJ(X) ((X << 5) | 0b00000101)
 #define C_NS(X) ((X << 1) & 0b00000010)
@@ -27,11 +27,11 @@
 #define SET \
     { F, A1, C_SET, A1 ^ C_SET, F }
 
-#define DISC \
-    { F, A1, C_DISC, A1 ^ C_DISC, F }
-
 #define UA \
     { F, A1, C_UA, A1 ^ C_UA, F }
+
+#define DISC \
+    { F, A1, C_DISC, A1 ^ C_DISC, F }
 
 #define RR(X) \
     { F, A1, C_RR(X), A1 ^ C_RR(X), F }
@@ -93,7 +93,7 @@ typedef enum _frame_state {
 
 static const char* FState_STRING[] = {FOREACH_STATE(GENERATE_STRING)};
 
-static const uchar* FFormat[] = {FOREACH_FORMAT(GENERATE_ENUM)};
+static const uchar FFormat[][FRAME_SIZE] = {FOREACH_FORMAT(GENERATE_ENUM)};
 
 #undef FOREACH_FRAME
 #undef FOREACH_STATE
@@ -108,6 +108,6 @@ sds byte_stuffing(sds input);
 uchar read_byte(int fd);
 
 // int read_incomming(int fd, uchar* msg_type);
-// int read_info(int fd, int id);
+// int read_info(int fd, int id); Bom dia!
 
 #endif  // _SU_FRAMES_H

@@ -46,14 +46,18 @@
 //     alarm_flag = true;
 // }
 
-bool receiver(int fd) {
+void receiver(int fd) {
     uchar rcved;
 
     frame_type frame_atual = ft_ANY;
     frame_state estado_atual = fs_START;
 
-    uchar format[] = UA;
-    sds ua_msg = sdsnewlen(format, sizeof(format));
+    sds ua = sdsnewframe(ft_UA);
+    sds rr0 = sdsnewframe(ft_RR0);
+    sds rr1 = sdsnewframe(ft_RR1);
+    sds disc = sdsnewframe(ft_DISC);
+
+    bool close = false;
 
     while (true) {
         int nbytes = read(fd, &rcved, sizeof rcved);
@@ -65,21 +69,41 @@ bool receiver(int fd) {
         if (estado_atual == fs_VALID) {
             switch (frame_atual) {
                 case ft_SET:
-                    write(fd, ua_msg, sdslen(ua_msg));
+                    write(fd, ua, sdslen(ua));
                     break;
+
+                case ft_UA:
+                    INFO("Recieved Last Flag. Closing connection.\n");
+                    close = true;
+                    break;
+
+                case ft_DISC:
+                    write(fd, disc, sdslen(disc));
+                    break;
+
                 case ft_INFO0:
+                    write(fd, rr1, sdslen(rr1));
                     break;
+
                 case ft_INFO1:
+                    write(fd, rr0, sdslen(rr0));
                     break;
+
                 default:
                     break;
             }
         }
+
+        if (close)
+            break;
     }
 
-    sdsfree(ua_msg);
-    return true;
-}
+    sdsfree(ua);
+    sdsfree(rr0);
+    sdsfree(rr1);
+    sdsfree(disc);
+} // TODO -> Fazer para enviar 
+
 /*
 typedef enum p_phases {
     establishment,

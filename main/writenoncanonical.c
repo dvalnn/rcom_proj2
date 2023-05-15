@@ -57,25 +57,22 @@ void alarm_handler(int signum)  // atende alarme
 
 bool llopen(int fd) {
     uchar rcved;
-
+    //
     frame_type ft_detected = ft_ANY, f_expected = ft_UA;
     frame_state fs_current = fs_START;
 
     bool success = false;
 
-    uchar format_buf[] = SET;
+    sds set = sdsnewframe(ft_SET);
+    sds set_repr = sdsempty();
 
-    sds set = sdsnewlen(format_buf, sizeof format_buf);
-    sds set_stuffed = byte_stuffing(set);
-    sds set_stuffed_repr = sdsempty();
-
-    set_stuffed_repr = sdscatrepr(set_stuffed_repr, set_stuffed, sdslen(set_stuffed));
+    set_repr = sdscatrepr(set_repr, set, sdslen(set));
 
     alarm_count = 0;
 
     while (true) {
-        LOG("Sending SET Message (stuffed) %s\n", set_stuffed_repr);
-        if (write(fd, set_stuffed, sdslen(set_stuffed)) == -1) {
+        LOG("Sending SET Message (stuffed) %s\n", set_repr);
+        if (write(fd, set, sdslen(set)) == -1) {
             ERROR("Write failes -- check connection\n");
         }
         LOG("Expecting UA response (Timing out in %ds, try number %d/%d)\n", ALARM_TIMEOUT_SEC, alarm_count + 1, MAX_RETRIES);
@@ -114,8 +111,7 @@ bool llopen(int fd) {
         ERROR("Handshake failure - check connection\n");
 
     sdsfree(set);
-    sdsfree(set_stuffed);
-    sdsfree(set_stuffed_repr);
+    sdsfree(set_repr);
 
     return success;
 }
@@ -139,7 +135,7 @@ int main(int argc, char** argv) {
         return -1;
     }
     // llopen -> llwrite -> llread -> llclose
-    // TODO llread/llwrite/llclose
+    // TODO: llread/llwrite/llclose
 
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");
