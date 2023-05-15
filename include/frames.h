@@ -22,6 +22,8 @@
 #define C_REJ(X) ((X << 5) | 0b00000101)
 #define C_NS(X) ((X << 1) & 0b00000010)
 
+#define FRAME_SIZE 5
+
 #define SET \
     { F, A1, C_SET, A1 ^ C_SET, F }
 
@@ -53,8 +55,6 @@ typedef unsigned char uchar;
     STATE(fs_VALID)
 
 #define FOREACH_FRAME(FRAME) \
-    FRAME(ft_ANY)            \
-    FRAME(ft_INVALID)        \
     FRAME(ft_SET)            \
     FRAME(ft_UA)             \
     FRAME(ft_DISC)           \
@@ -63,7 +63,20 @@ typedef unsigned char uchar;
     FRAME(ft_REJ0)           \
     FRAME(ft_REJ1)           \
     FRAME(ft_INFO0)          \
-    FRAME(ft_INFO1)
+    FRAME(ft_INFO1)          \
+    FRAME(ft_ANY)            \
+    FRAME(ft_INVALID)
+
+#define FOREACH_FORMAT(FORMAT) \
+    FORMAT(SET)                \
+    FORMAT(UA)                 \
+    FORMAT(DISC)               \
+    FORMAT(RR(0))              \
+    FORMAT(RR(1))              \
+    FORMAT(REJ(0))             \
+    FORMAT(REJ(1))             \
+    FORMAT(INFO_MSG(0))        \
+    FORMAT(INFO_MSG(1))
 
 #define GENERATE_ENUM(ENUM) ENUM,
 #define GENERATE_STRING(STRING) #STRING,
@@ -80,13 +93,17 @@ typedef enum _frame_state {
 
 static const char* FState_STRING[] = {FOREACH_STATE(GENERATE_STRING)};
 
+static const uchar* FFormat[] = {FOREACH_FORMAT(GENERATE_ENUM)};
+
 #undef FOREACH_FRAME
 #undef FOREACH_STATE
+#undef FOREACH_FORMAT
 #undef GENERATE_ENUM
 #undef GENERATE_STRING
 
-frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved);
+#define sdsnewframe(frame_type) sdsnewlen(FFormat[frame_type], FRAME_SIZE)
 
+frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved);
 sds byte_stuffing(sds input);
 uchar read_byte(int fd);
 

@@ -49,23 +49,31 @@
 bool receiver(int fd) {
     uchar rcved;
 
-    frame_type frame_atual = ft_ANY, esperado = ft_SET;
+    frame_type frame_atual = ft_ANY;
     frame_state estado_atual = fs_START;
 
     uchar format[] = UA;
     sds ua_msg = sdsnewlen(format, sizeof(format));
-    sds ua_stuffed = byte_stuffing(ua_msg);
 
     while (true) {
-        rcved = read_byte(fd);
-        if (!rcved)
+        int nbytes = read(fd, &rcved, sizeof rcved);
+        if (!nbytes)
             continue;
-            
+
         estado_atual = frame_handler(estado_atual, &frame_atual, rcved);
 
-        if (frame_atual == esperado && estado_atual == fs_VALID) {
-            write(fd, ua_stuffed, sdslen(ua_stuffed));
-            break;
+        if (estado_atual == fs_VALID) {
+            switch (frame_atual) {
+                case ft_SET:
+                    write(fd, ua_msg, sdslen(ua_msg));
+                    break;
+                case ft_INFO0:
+                    break;
+                case ft_INFO1:
+                    break;
+                default:
+                    break;
+            }
         }
     }
 

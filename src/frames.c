@@ -1,5 +1,9 @@
 #include "frames.h"
 
+sds create_frame(frame_type ftype) {
+    return sdsnewlen(FFormat[ftype], FRAME_SIZE);
+}
+
 frame_type control_byte_handler(uchar byte) {
     switch (byte) {
         case C_SET:
@@ -31,6 +35,7 @@ bool bcc1_handler(uchar byte, frame_type ftype) {
 
         case ft_UA:
             return byte == (A1 ^ C_UA);
+
         case ft_DISC:
             return byte == (A1 ^ C_DISC);
 
@@ -117,11 +122,12 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
 
         case fs_INFO:
             if (rcved == F)
-                new_state = fs_VALID;
+                new_state = fs_BCC2_OK;
             break;
 
         case fs_BCC2_OK:
             // TODO: Handler p/ bcc2
+            new_state = fs_VALID;
             break;
 
         case fs_VALID:
