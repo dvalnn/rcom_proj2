@@ -57,7 +57,7 @@ void alarm_handler(int signum)  // atende alarme
 
 bool llopen(int fd) {
     uchar rcved;
-    //
+    
     frame_type ft_detected = ft_ANY, f_expected = ft_UA;
     frame_state fs_current = fs_START;
 
@@ -65,11 +65,11 @@ bool llopen(int fd) {
 
     sds set = sdsnewframe(ft_SET);
     sds set_repr = sdsempty();
-
+    
     set_repr = sdscatrepr(set_repr, set, sdslen(set));
 
     alarm_count = 0;
-
+    
     while (true) {
         LOG("Sending SET Message (stuffed) %s\n", set_repr);
         if (write(fd, set, sdslen(set)) == -1) {
