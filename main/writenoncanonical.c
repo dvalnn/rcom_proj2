@@ -55,65 +55,106 @@ void alarm_handler(int signum)  // atende alarme
     }
 }
 
-bool llopen(int fd) {
+bool send_frame(int fd, sds packet, frame_type ft_expected) {
     uchar rcved;
-    
-    frame_type ft_detected = ft_ANY, f_expected = ft_UA;
+
+    frame_type ft_detected = ft_ANY;
     frame_state fs_current = fs_START;
 
     bool success = false;
 
-    sds set = sdsnewframe(ft_SET);
-    sds set_repr = sdsempty();
-    
-    set_repr = sdscatrepr(set_repr, set, sdslen(set));
-
-    alarm_count = 0;
-    
-    while (true) {
-        LOG("Sending SET Message (stuffed) %s\n", set_repr);
-        if (write(fd, set, sdslen(set)) == -1) {
-            ERROR("Write failes -- check connection\n");
-        }
-        LOG("Expecting UA response (Timing out in %ds, try number %d/%d)\n", ALARM_TIMEOUT_SEC, alarm_count + 1, MAX_RETRIES);
+    while (alarm_count < MAX_RETRIES) {
+        write(fd, packet, sdslen(packet));
 
         alarm(ALARM_TIMEOUT_SEC);
         while (true) {
             if (alarm_flag)
                 break;
 
-            rcved = read_byte(fd);
-            if (!rcved)
-                continue;
-
+            int nbytes = read(fd, &rcved, sizeof rcved);
             fs_current = frame_handler(fs_current, &ft_detected, rcved);
 
-            if (ft_detected == f_expected && fs_current == fs_VALID) {
+            if (ft_detected == ft_expected && fs_current == fs_VALID) {
                 alarm(0);
                 success = true;
                 break;
             }
         }
-
         if (success)
             break;
 
         alarm_flag = false;
-        if (alarm_count == MAX_RETRIES) {
-            alarm_count = 0;
-            break;
-        }
     }
+
+    alarm_count = 0;
+    return success;
+}
+
+bool llopen(int fd) {
+    sds set = sdsnewframe(ft_SET);
+
+    bool success = send_frame(fd, set, ft_UA);
+
+    sdsfree(set);
 
     if (success)
         INFO("Handshake complete\n");
     else
         ERROR("Handshake failure - check connection\n");
 
-    sdsfree(set);
-    sdsfree(set_repr);
-
     return success;
+}
+
+uchar calculate_bcc2(sds data) {
+    uchar bcc2 = data[0];
+    for (int i = 1; i < sdslen(data); i++)
+        bcc2 = bcc2 ^ data[i];
+    return bcc2;
+}
+
+bool llwrite(int fd, char* filepath) {
+    int file = open(filepath, O_RDONLY);
+    if (file == -1) {
+        ERROR("Could not open '%s' file\n", filepath);
+        return false;
+    }
+
+    int id = 0;
+    uchar buf[READ_BUFFER_SIZE];
+
+    while (true) {
+        int nbytes = read(file, &buf, READ_BUFFER_SIZE);
+        if (!nbytes)
+            break;
+
+        frame_type ft_expected = id ? ft_RR0 : ft_RR1;
+        frame_type ft_format = id ? ft_INFO1 : ft_INFO0;
+
+        //* Create the INFO frame header (without BCC2 and Last Flag)
+        sds header = sdsnewframe(ft_format);
+        sdsrange(header, 0, -3);
+
+        //* Create data string from buf and calculate bcc2
+        sds data = sdsnewlen(buf, nbytes);
+        uchar bcc2 = calculate_bcc2(data);
+        uchar tail[] = {bcc2, F, '\0'};
+
+        //* Format INFO frame with header and tail and byte-stuff data
+        sds data_formated = sdscatsds(header, byte_stuffing(data));
+        data_formated = sdscat(data_formated, (char*)tail);
+
+        sds data_formated_repr = sdscatrepr(sdsempty(), data_formated, sdslen(data_formated));
+        LOG("Formated INFO frame: %s\n", data_formated_repr);
+
+        send_frame(fd, data_formated, ft_expected);
+
+        id = !id;
+
+        sdsfree(data);
+        sdsfree(data_formated);
+    }
+    close(file);
+    return true;
 }
 
 int main(int argc, char** argv) {
@@ -134,6 +175,8 @@ int main(int argc, char** argv) {
         INFO("Serial connection closed\n");
         return -1;
     }
+
+    llwrite(fd, "wywh.txt");
     // llopen -> llwrite -> llread -> llclose
     // TODO: llread/llwrite/llclose
 
