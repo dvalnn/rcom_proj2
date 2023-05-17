@@ -46,6 +46,22 @@
 //     alarm_flag = true;
 // }
 
+void write_to_file(sds data, char* filename) {
+    int file = open(filename, O_WRONLY | O_CREAT);
+    write(file, data, sdslen(data));
+    close(file);
+}
+
+uchar validate_bcc2(sds data) {
+    uchar bcc2 = data[0];
+    uchar bcc2_expected = data[sdslen(data) - 1];
+
+    for (int i = 1; i < sdslen(data) - 1; i++)
+        bcc2 = bcc2 ^ data[i];
+
+    return bcc2 == bcc2_expected;
+}
+
 void receiver(int fd) {
     uchar rcved;
 
@@ -57,6 +73,10 @@ void receiver(int fd) {
     sds rr1 = sdsnewframe(ft_RR1);
     sds disc = sdsnewframe(ft_DISC);
 
+    sds info_buf = sdsnewlen(sdsempty(), READ_BUFFER_SIZE);
+    sds info_destuffed = sdsempty();
+    int buf_len = 0;
+
     bool close = false;
 
     while (true) {
@@ -66,33 +86,63 @@ void receiver(int fd) {
 
         estado_atual = frame_handler(estado_atual, &frame_atual, rcved);
 
-        if (estado_atual == fs_VALID) {
-            switch (frame_atual) {
-                case ft_SET:
-                    write(fd, ua, sdslen(ua));
-                    break;
+        switch (estado_atual) {
+            case fs_START:
+                sdsclear(info_buf);
+                break;
 
-                case ft_UA:
-                    INFO("Recieved Last Flag. Closing connection.\n");
-                    close = true;
-                    break;
+            case fs_INFO:
+                info_buf[buf_len] = rcved;
+                buf_len++;
+                break;
 
-                case ft_DISC:
-                    write(fd, disc, sdslen(disc));
-                    break;
+            case fs_BCC2_OK:
+                info_buf = sdsRemoveFreeSpace(info_buf);
+                info_destuffed = byte_stuffing(info_buf, false);
+                estado_atual = frame_handler(estado_atual, &frame_atual, validate_bcc2(info_destuffed));
+                sdsrange(info_buf, 0, -2);
+                buf_len = 0;
+                break;
 
-                case ft_INFO0:
-                    write(fd, rr1, sdslen(rr1));
-                    break;
+            case fs_VALID:
+                switch (frame_atual) {
+                    case ft_SET:
+                        write(fd, ua, sdslen(ua));
+                        break;
 
-                case ft_INFO1:
-                    write(fd, rr0, sdslen(rr0));
-                    break;
+                    case ft_UA:
+                        INFO("Received Last Flag. Closing connection.\n");
+                        close = true;
+                        break;
 
-                default:
-                    break;
-            }
+                    case ft_DISC:
+                        write(fd, disc, sdslen(disc));
+                        break;
+
+                    case ft_INFO0:
+                        write_to_file(info_buf, "output.txt");
+                        write(fd, rr1, sdslen(rr1));
+                        break;
+
+                    case ft_INFO1:
+                        write_to_file(info_buf, "output.txt");
+                        write(fd, rr0, sdslen(rr0));
+                        break;
+
+                    default:
+                        close = true;
+                        break;
+                }
+                // reset the state machine
+                frame_atual = frame_handler(frame_atual, &frame_atual, 0);
+                break;
+
+            default:
+                break;
         }
+
+        if (buf_len > sdslen(info_buf))
+            sdsgrowzero(info_buf, sdslen(info_buf) + READ_BUFFER_SIZE);
 
         if (close)
             break;
@@ -102,7 +152,8 @@ void receiver(int fd) {
     sdsfree(rr0);
     sdsfree(rr1);
     sdsfree(disc);
-} // TODO -> Fazer para enviar 
+    sdsfree(info_buf);
+}  // TODO -> Fazer para enviar
 
 /*
 typedef enum p_phases {

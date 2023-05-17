@@ -17,10 +17,10 @@
 
 #define C_SET 0b00000011
 #define C_UA 0b00000111
-#define C_DISC 0b00001011
+#define C_DISC 0b000001011
 #define C_RR(X) ((X << 5) | 0b00000001)
 #define C_REJ(X) ((X << 5) | 0b00000101)
-#define C_NS(X) ((X << 1) & 0b00000010)
+#define C_NS(X) ((X << 5) | 0b00000010)
 
 #define FRAME_SIZE 5
 
@@ -104,7 +104,7 @@ static const uchar FFormat[][FRAME_SIZE] = {FOREACH_FORMAT(GENERATE_ENUM)};
 #define sdsnewframe(frame_type) sdsnewlen(FFormat[frame_type], FRAME_SIZE)
 
 frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved);
-sds byte_stuffing(sds input);
+sds byte_stuffing(sds input, bool stuff_string);
 uchar read_byte(int fd);
 
 // int read_incomming(int fd, uchar* msg_type);

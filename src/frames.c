@@ -66,11 +66,14 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
     frame_state new_state = cur_state;
     frame_type candidate = *ftype;
 
-    ALERT("Candidate frame: %s\n", FType_STRING[candidate]);
-    ALERT("Currente state: %s\n", FState_STRING[cur_state]);
+    ALERT("-------------\n");
+    ALERT("Current frame: %s\n", FType_STRING[candidate]);
+    ALERT("Current state: %s\n", FState_STRING[cur_state]);
+    ALERT("Received char: 0x%.02x\n", (unsigned int)(rcved & 0xFF));
 
     switch (new_state) {
         case fs_START:
+            candidate = ft_ANY;
             if (rcved == F)
                 new_state = fs_FLAG1;
             break;
@@ -103,10 +106,8 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
             }
             if (bcc1_handler(rcved, candidate))
                 new_state = fs_BCC1_OK;
-            else {
+            else
                 new_state = fs_START;
-                candidate = ft_INVALID;
-            }
             break;
 
         case fs_BCC1_OK:
@@ -114,10 +115,8 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
                 new_state = fs_VALID;
             } else if ((candidate == ft_INFO0 || candidate == ft_INFO1))
                 new_state = fs_INFO;
-            else {
+            else
                 new_state = fs_START;
-                candidate = ft_INVALID;
-            }
             break;
 
         case fs_INFO:
@@ -126,34 +125,62 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
             break;
 
         case fs_BCC2_OK:
-            // TODO: Handler p/ bcc2
-            new_state = fs_VALID;
+            if (rcved == 1)
+                new_state = fs_VALID;
+            else {
+                candidate = ft_INVALID;
+                new_state = fs_START;
+            }
             break;
 
         case fs_VALID:
+            new_state = fs_START;
+            candidate = ft_ANY;
             break;
     }
 
+    ALERT("Next frame: %s\n", FType_STRING[candidate]);
+    ALERT("Next state: %s\n", FState_STRING[new_state]);
+    ALERT("-------------\n\n");
     *ftype = candidate;
     return new_state;
 }
 
-sds byte_stuffing(sds input) {
+/**
+ * @brief byte stuffing and destuffing funtion
+ *
+ * @param input sds string to stuff / destuff
+ * @param stuff_string true for stuffing operation, false for destuffing
+ * @return sds
+ */
+sds byte_stuffing(sds input, bool stuff_string) {
     int ntokens;
 
-    char sep_token1[] = {ESC};
+    char split_token1[] = {ESC};
     char join_token1[] = {ESC, ESC_SEQ(ESC)};
 
-    char sep_token2[] = {F};
+    char split_token2[] = {F};
     char join_token2[] = {ESC, ESC_SEQ(F)};
 
-    sds* tokens = sdssplitlen(input, sdslen(input), sep_token1, 1, &ntokens);
+    char* split_token = stuff_string ? split_token1 : join_token1;
+    int split_size = stuff_string ? sizeof split_token1 : sizeof join_token1;
+
+    char* join_token = stuff_string ? join_token1 : split_token1;
+    int join_size = stuff_string ? sizeof join_token1 : sizeof split_token1;
+
+    sds* tokens = sdssplitlen(input, sdslen(input), split_token1, split_size, &ntokens);
     sds pass1 = sdsjoinsds(tokens, ntokens, join_token1, sizeof join_token1);
 
     sdsfreesplitres(tokens, ntokens);
 
-    tokens = sdssplitlen(pass1, sdslen(pass1), sep_token2, 1, &ntokens);
-    sds result = sdsjoinsds(tokens, ntokens, join_token2, sizeof join_token2);
+    split_token = stuff_string ? split_token2 : join_token2;
+    split_size = stuff_string ? sizeof split_token2 : sizeof join_token2;
+
+    join_token = stuff_string ? join_token2 : split_token2;
+    join_size = stuff_string ? sizeof join_token2 : sizeof split_token2;
+
+    tokens = sdssplitlen(pass1, sdslen(pass1), split_token, split_size, &ntokens);
+    sds result = sdsjoinsds(tokens, ntokens, join_token, join_size);
 
     sdsfreesplitres(tokens, ntokens);
     sdsfree(pass1);
@@ -161,6 +188,12 @@ sds byte_stuffing(sds input) {
     return result;
 }
 
+/**
+ * @brief obsolete
+ *
+ * @param input
+ * @return uchar
+ */
 uchar byte_destuffing(uchar input) {
     if (input == ESC)
         return 1;
@@ -172,6 +205,12 @@ uchar byte_destuffing(uchar input) {
     return 0;
 }
 
+/**
+ * @brief obsolete
+ *
+ * @param fd
+ * @return uchar
+ */
 uchar read_byte(int fd) {
     uchar byte1;
     uchar byte2;
