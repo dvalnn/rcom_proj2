@@ -22,7 +22,7 @@
 #define ALARM_TIMEOUT_SEC 3
 #define ALARM_SLEEP_SEC 1
 
-#define READ_BUFFER_SIZE 256
+#define READ_BUFFER_SIZE 32
 
 bool alarm_flag = false;
 int alarm_count = 0;
@@ -59,7 +59,7 @@ bool send_frame(int fd, sds packet, frame_type ft_expected) {
     uchar rcved;
 
     frame_type ft_detected = ft_ANY;
-    frame_state fs_current = fs_START;
+    frame_state fs_current = fs_FLAG1;
 
     bool success = false;
 
@@ -79,8 +79,6 @@ bool send_frame(int fd, sds packet, frame_type ft_expected) {
             if (ft_detected == ft_expected && fs_current == fs_VALID) {
                 alarm(0);
                 success = true;
-                //reset the state machine
-                fs_current = frame_handler(fs_current, &ft_detected, 0);
                 break;
             }
         }
@@ -136,7 +134,7 @@ bool llwrite(int fd, char* filepath) {
 
         //* Create the INFO frame header (without BCC2 and Last Flag)
         sds header = sdsnewframe(ft_format);
-        sdsrange(header, 0, -3);
+        sdsrange(header, 0, -2);
 
         //* Create data string from buf and calculate bcc2
         sds data = sdsnewlen(buf, nbytes);
@@ -179,10 +177,8 @@ int main(int argc, char** argv) {
         INFO("Serial connection closed\n");
         return -1;
     }
-    sleep(3);
 
-    llopen(fd);
-    // llwrite(fd, "wywh.txt");
+    llwrite(fd, "wywh.txt");
     // llopen -> llwrite -> llread -> llclose
     // TODO: llread/llwrite/llclose
 

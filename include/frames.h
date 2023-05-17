@@ -39,19 +39,19 @@
 #define REJ(X) \
     { F, A1, C_REJ(X), A1 ^ C_REJ(X), F }
 
-#define INFO_MSG(X) \
+#define INFO_HEADER(X) \
     { F, A1, C_NS(X), A1 ^ C_NS(X), F }
 
 typedef unsigned char uchar;
 
 #define FOREACH_STATE(STATE) \
-    STATE(fs_START)          \
     STATE(fs_FLAG1)          \
     STATE(fs_A)              \
     STATE(fs_C)              \
     STATE(fs_BCC1_OK)        \
     STATE(fs_INFO)           \
     STATE(fs_BCC2_OK)        \
+    STATE(fs_FLAG2)          \
     STATE(fs_VALID)
 
 #define FOREACH_FRAME(FRAME) \
@@ -75,8 +75,8 @@ typedef unsigned char uchar;
     FORMAT(RR(1))              \
     FORMAT(REJ(0))             \
     FORMAT(REJ(1))             \
-    FORMAT(INFO_MSG(0))        \
-    FORMAT(INFO_MSG(1))
+    FORMAT(INFO_HEADER(0))     \
+    FORMAT(INFO_HEADER(1))
 
 #define GENERATE_ENUM(ENUM) ENUM,
 #define GENERATE_STRING(STRING) #STRING,

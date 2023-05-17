@@ -62,11 +62,11 @@ uchar validate_bcc2(sds data) {
     return bcc2 == bcc2_expected;
 }
 
-void receiver(int fd) {
+bool receiver(int fd) {
     uchar rcved;
 
     frame_type frame_atual = ft_ANY;
-    frame_state estado_atual = fs_START;
+    frame_state estado_atual = fs_FLAG1;
 
     sds ua = sdsnewframe(ft_UA);
     sds rr0 = sdsnewframe(ft_RR0);
@@ -78,6 +78,7 @@ void receiver(int fd) {
     int buf_len = 0;
 
     bool close = false;
+    bool terminate_connection = false;
 
     while (true) {
         int nbytes = read(fd, &rcved, sizeof rcved);
@@ -87,9 +88,16 @@ void receiver(int fd) {
         estado_atual = frame_handler(estado_atual, &frame_atual, rcved);
 
         switch (estado_atual) {
-            case fs_START:
+            case fs_FLAG1:
                 sdsclear(info_buf);
                 break;
+
+            case fs_BCC1_OK:
+                if (frame_atual == ft_INFO0 || frame_atual == ft_INFO1) {
+                    info_buf[buf_len] = rcved;
+                    buf_len++;
+                } else
+                    break;
 
             case fs_INFO:
                 info_buf[buf_len] = rcved;
@@ -105,6 +113,7 @@ void receiver(int fd) {
                 break;
 
             case fs_VALID:
+                close = true;
                 switch (frame_atual) {
                     case ft_SET:
                         write(fd, ua, sdslen(ua));
@@ -112,7 +121,8 @@ void receiver(int fd) {
 
                     case ft_UA:
                         INFO("Received Last Flag. Closing connection.\n");
-                        close = true;
+                        terminate_connection = true;
+                        // close = true;
                         break;
 
                     case ft_DISC:
@@ -130,11 +140,8 @@ void receiver(int fd) {
                         break;
 
                     default:
-                        close = true;
                         break;
                 }
-                // reset the state machine
-                frame_atual = frame_handler(frame_atual, &frame_atual, 0);
                 break;
 
             default:
@@ -153,7 +160,9 @@ void receiver(int fd) {
     sdsfree(rr1);
     sdsfree(disc);
     sdsfree(info_buf);
-}  // TODO -> Fazer para enviar
+
+    return terminate_connection;
+}
 
 /*
 typedef enum p_phases {
@@ -256,14 +265,8 @@ int main(int argc, char** argv) {
     serial_config(fd, &oldtio);
     INFO("New termios structure set.\n");
 
-    receiver(fd);
-
-    // while (receiver(fd)) {
-    //     continue;
-    // }
-    // handshake_handler(fd);
-
-    // p_phase_handler(fd);
+    while (!receiver(fd))
+        continue;
 
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");
