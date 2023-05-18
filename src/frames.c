@@ -152,53 +152,6 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
     return new_state;
 }
 
-/**
- * @brief byte stuffing and destuffing funtion
- *
- * @param input sds string to stuff / destuff
- * @param stuff_string true for stuffing operation, false for destuffing
- * @return sds
- */
-/*
-sds byte_stuffing(sds input, bool stuff_string) {
-    int ntokens;
-
-    char split_token1[] = {ESC};
-    char join_token1[] = {ESC, ESC_SEQ(ESC)};
-
-    char split_token2[] = {F};
-    char join_token2[] = {ESC, ESC_SEQ(F)};
-
-    char* split_token = stuff_string ? split_token1 : join_token1;
-    int split_size = stuff_string ? sizeof split_token1 : sizeof join_token1;
-
-    char* join_token = stuff_string ? join_token1 : split_token1;
-    int join_size = stuff_string ? sizeof join_token1 : sizeof split_token1;
-
-    sds* tokens = sdssplitlen(input, sdslen(input), split_token1, split_size, &ntokens);
-    sds pass1 = sdsjoinsds(tokens, ntokens, join_token1, sizeof join_token1);
-
-    sdsfreesplitres(tokens, ntokens);
-
-    split_token = stuff_string ? split_token2 : join_token2;
-    split_size = stuff_string ? sizeof split_token2 : sizeof join_token2;
-
-    join_token = stuff_string ? join_token2 : split_token2;
-    join_size = stuff_string ? sizeof join_token2 : sizeof split_token2;
-
-    tokens = sdssplitlen(pass1, sdslen(pass1), split_token, split_size, &ntokens);
-    sds result = sdsjoinsds(tokens, ntokens, join_token, join_size);
-
-    sdsfreesplitres(tokens, ntokens);
-    sdsfree(pass1);
-
-    return result;
-}
-*/
-
-// write a fucntion to stuff a byte stream.
-// ESC -> ESC ESC_SEQ(ESC)
-// F -> ESC ESC_SEQ(F)
 sds byte_stuffing(sds input_data) {
     sds output_data = sdsempty();
 
@@ -228,7 +181,6 @@ sds byte_stuffing(sds input_data) {
     return output_data;
 }
 
-// write a fucntion the destuff a byte stream that was stuffed with the previous function
 sds byte_destuffing(sds input_data) {
     sds output_data = sdsempty();
 
