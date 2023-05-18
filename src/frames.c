@@ -208,6 +208,9 @@ sds byte_stuffing_alt(sds input_data) {
     uchar flag = F;
     uchar escaped_flag = ESC_SEQ(F);
 
+    uchar zero = 0;
+    uchar escaped_zero = ESC_SEQ(0);
+
     for (int i = 0; i < sdslen(input_data); i++) {
         if (input_data[i] == ESC) {
             output_data = sdscatlen(output_data, &escape, 1);
@@ -215,6 +218,9 @@ sds byte_stuffing_alt(sds input_data) {
         } else if (input_data[i] == flag) {
             output_data = sdscatlen(output_data, &escape, 1);
             output_data = sdscatlen(output_data, &escaped_flag, 1);
+        } else if (input_data[i] == zero) {
+            output_data = sdscatlen(output_data, &escape, 1);
+            output_data = sdscatlen(output_data, &escaped_zero, 1);
         } else {
             output_data = sdscatlen(output_data, &input_data[i], 1);
         }
@@ -232,6 +238,9 @@ sds byte_destuffing(sds input_data) {
     uchar flag = F;
     uchar escaped_flag = ESC_SEQ(F);
 
+    uchar zero = 0;
+    uchar escaped_zero = ESC_SEQ(0);
+
     for (int i = 0; i < sdslen(input_data); i++) {
         if (input_data[i] == escape) {
             if (input_data[i + 1] == escaped_escape) {
@@ -240,7 +249,12 @@ sds byte_destuffing(sds input_data) {
             } else if (input_data[i + 1] == escaped_flag) {
                 output_data = sdscatlen(output_data, &flag, 1);
                 i++;
-            }
+            } else if (input_data[i + 1] == escaped_zero) {
+                output_data = sdscatlen(output_data, &zero, 1);
+                i++;
+            } else
+                output_data = sdscatlen(output_data, &input_data[i], 1);
+
         } else {
             output_data = sdscatlen(output_data, &input_data[i], 1);
         }

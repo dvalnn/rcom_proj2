@@ -25,17 +25,13 @@
 #define READ_BUFFER_SIZE 256
 
 bool alarm_flag = false;
-int alarm_count = 0;
+int alarm_counter = 0;
 
 void alarm_handler(int signum)  // atende alarme
 {
-    alarm_count++;
+    alarm_counter++;
     alarm_flag = true;
-    ERROR("Alarm Interrupt Triggered with code %d - Attempt %d/%d\n", signum, alarm_count, MAX_RETRIES);
-    if (alarm_count < MAX_RETRIES) {
-        INFO("Sleeping for %ds before next attempt\n\n", ALARM_SLEEP_SEC);
-        sleep(ALARM_SLEEP_SEC);
-    }
+    ERROR("Alarm Interrupt Triggered with code %d - Attempt %d/%d\n", signum, alarm_counter, MAX_RETRIES);
 }
 
 bool send_frame(int fd, sds packet, frame_type ft_expected) {
@@ -46,7 +42,7 @@ bool send_frame(int fd, sds packet, frame_type ft_expected) {
 
     bool success = false;
 
-    while (alarm_count < MAX_RETRIES) {
+    while (alarm_counter < MAX_RETRIES) {
         write(fd, packet, sdslen(packet));
 
         alarm(ALARM_TIMEOUT_SEC);
@@ -61,7 +57,7 @@ bool send_frame(int fd, sds packet, frame_type ft_expected) {
 
             if (ft_detected == ft_expected && fs_current == fs_VALID) {
                 alarm(0);
-                alarm_count = 0;
+                alarm_counter = 0;
                 success = true;
                 break;
             }
