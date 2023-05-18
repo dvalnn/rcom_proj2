@@ -27,23 +27,6 @@
 bool alarm_flag = false;
 int alarm_count = 0;
 
-/*
-#define TIME_OUT(FUNC, RET_VAL)        \
-    {                                  \
-        alarm_flag = false;            \
-        alarm(ALARM_TIMEOUT_SEC);      \
-        while (!alarm_flag) {          \
-            RET_VAL = FUNC;            \
-            if (RET_VAL) {             \
-                alarm(0);              \
-                break;                 \
-            }                          \
-        }                              \
-                                       \
-        ALERT("Command timed out.\n"); \
-    }
-*/
-
 void alarm_handler(int signum)  // atende alarme
 {
     alarm_count++;
@@ -100,6 +83,19 @@ bool llopen(int fd) {
         INFO("Handshake complete\n");
     else
         ERROR("Handshake failure - check connection\n");
+
+    return success;
+}
+
+bool llclose(int fd) {
+    sds disc = sdsnewframe(ft_DISC);
+    bool success = send_frame(fd, disc, ft_DISC);
+    sdsfree(disc);
+
+    if (success)
+        INFO("Connection complete\n");
+    else
+        ERROR("Disconnect failure\n");
 
     return success;
 }
