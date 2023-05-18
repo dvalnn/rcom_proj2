@@ -22,7 +22,7 @@
 #define ALARM_TIMEOUT_SEC 3
 #define ALARM_SLEEP_SEC 1
 
-#define READ_BUFFER_SIZE 32
+#define READ_BUFFER_SIZE 4048
 
 bool alarm_flag = false;
 int alarm_count = 0;
@@ -93,9 +93,7 @@ bool send_frame(int fd, sds packet, frame_type ft_expected) {
 
 bool llopen(int fd) {
     sds set = sdsnewframe(ft_SET);
-
     bool success = send_frame(fd, set, ft_UA);
-
     sdsfree(set);
 
     if (success)
@@ -178,8 +176,9 @@ int main(int argc, char** argv) {
     }
 
     llwrite(fd, "wywh.txt");
+    // llclose(fd);
     // llopen -> llwrite -> llread -> llclose
-    // TODO: llread/llwrite/llclose
+    // TODO: llread
 
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");

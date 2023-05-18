@@ -21,8 +21,6 @@
 #define ALARM_TIMEOUT_SEC 3
 #define RETRY_INTERVAL_SEC 1
 
-#define READ_BUFFER_SIZE 256
-
 // bool alarm_flag = false;
 /*
 #define TIME_OUT(FUNC, RET_VAL)        \
@@ -71,7 +69,7 @@ uchar validate_bcc2(sds data) {
     return bcc2 == bcc2_expected;
 }
 
-bool receiver(int fd) {
+bool receiver(int fd, int file) {
     uchar rcved;
 
     frame_type frame_atual = ft_ANY;
@@ -82,7 +80,6 @@ bool receiver(int fd) {
     sds rr1 = sdsnewframe(ft_RR1);
     sds disc = sdsnewframe(ft_DISC);
 
-    // sds info_buf = sdsnewlen(sdsempty(), READ_BUFFER_SIZE);
     sds info_buf = sdsempty();
     sds data = sdsempty();
 
@@ -106,7 +103,7 @@ bool receiver(int fd) {
             LOG("Adding 0x%.02x = '%c' to buffer\n", (unsigned int)(rcved & 0xFF), rcved);
             char buf[] = {rcved, '\0'};
             info_buf = sdscat(info_buf, buf);
-            INFO("Current Buffer: %s\n\n", info_buf);
+            LOG("Current Buffer: %s\n\n", info_buf);
         }
 
         if (estado_atual == fs_BCC2_OK) {
@@ -130,21 +127,23 @@ bool receiver(int fd) {
                 case ft_UA:
                     INFO("Received Last Flag. Closing connection.\n");
                     terminate_connection = true;
-                    // close = true;
                     break;
 
                 case ft_DISC:
                     write(fd, disc, sdslen(disc));
+                    terminate_connection = true;
                     break;
 
                 case ft_INFO0:
-                    write_to_file(data, "output.txt");
+                    write(file, data, sdslen(data));
                     write(fd, rr1, sdslen(rr1));
+                    terminate_connection = true;
                     break;
 
                 case ft_INFO1:
-                    write_to_file(data, "output.txt");
+                    write(file, data, sdslen(data));
                     write(fd, rr0, sdslen(rr0));
+                    terminate_connection = true;
                     break;
 
                 default:
@@ -169,6 +168,7 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
+    int file = open("output.txt", O_WRONLY | O_CREAT);
     // (void)signal(SIGALRM, alarm_handler);
 
     struct termios oldtio;
@@ -176,9 +176,10 @@ int main(int argc, char** argv) {
     serial_config(fd, &oldtio);
     INFO("New termios structure set.\n");
 
-    while (!receiver(fd))
+    while (!receiver(fd, file))
         continue;
 
+    close(file);
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");
     return 0;
