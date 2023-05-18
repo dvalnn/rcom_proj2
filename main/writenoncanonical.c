@@ -22,7 +22,7 @@
 #define ALARM_TIMEOUT_SEC 3
 #define ALARM_SLEEP_SEC 1
 
-#define READ_BUFFER_SIZE 8
+#define READ_BUFFER_SIZE 256
 
 bool alarm_flag = false;
 int alarm_count = 0;
@@ -134,16 +134,19 @@ bool llwrite(int fd, char* filepath) {
         //* Create data string from buf and calculate bcc2
         sds data = sdsnewlen(buf, nbytes);
         uchar bcc2 = calculate_bcc2(data);
-        uchar tail[] = {bcc2, F, '\0'};
+        uchar tail1[] = {bcc2, '\0'};
+        uchar tail2[] = {F, '\0'};
 
-        //* Format INFO frame with header and tail and byte-stuff data
-        sds data_formated = sdscatsds(header, byte_stuffing(data, true));
-        data_formated = sdscat(data_formated, (char*)tail);
+        //* Append bcc2 to data frame
+        data = sdscat(data, (char*)tail1);
+        //* Byte-stuff date and bcc2
+        sds stuffed_data = byte_stuffing_alt(data);
+        sds data_formated = sdscatsds(header, stuffed_data);
+        //* Append final flag
+        data_formated = sdscat(data_formated, (char*)tail2);
 
-        // sds data_formated_repr = sdscatrepr(sdsempty(), data_formated, sdslen(data_formated));
         sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
-        // LOG("Formated INFO frame: %s\n", data_formated_repr);
-        INFO("Sending data frame: \n\t>>%s\n", data_repr);
+        INFO("Sending data frame: \n\t>>%s\n\t>>Lenght: %ld\n", data_repr, sdslen(data));
         LOG("Calculated BCC2: 0x%.02x = '%c'\n\n", (unsigned int)(bcc2 & 0xFF), bcc2);
         success = send_frame(fd, data_formated, ft_expected);
         if (!success)
@@ -153,6 +156,7 @@ bool llwrite(int fd, char* filepath) {
 
         sdsfree(data);
         sdsfree(data_repr);
+        sdsfree(stuffed_data);
         sdsfree(data_formated);
     }
 
@@ -181,8 +185,10 @@ int main(int argc, char** argv) {
     if (is_open)
         write_success = llwrite(fd, argv[2]);
 
-    if (is_open && write_success)
-        llclose(fd);
+    if (!write_success)
+        ERROR("File transfer failed\n");
+
+    llclose(fd);
 
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");

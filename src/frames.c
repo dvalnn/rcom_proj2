@@ -159,6 +159,7 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
  * @param stuff_string true for stuffing operation, false for destuffing
  * @return sds
  */
+/*
 sds byte_stuffing(sds input, bool stuff_string) {
     int ntokens;
 
@@ -192,4 +193,57 @@ sds byte_stuffing(sds input, bool stuff_string) {
     sdsfree(pass1);
 
     return result;
+}
+*/
+
+// write a fucntion to stuff a byte stream.
+// ESC -> ESC ESC_SEQ(ESC)
+// F -> ESC ESC_SEQ(F)
+sds byte_stuffing_alt(sds input_data) {
+    sds output_data = sdsempty();
+
+    uchar escape = ESC;
+    uchar escaped_escape = ESC_SEQ(ESC);
+
+    uchar flag = F;
+    uchar escaped_flag = ESC_SEQ(F);
+
+    for (int i = 0; i < sdslen(input_data); i++) {
+        if (input_data[i] == ESC) {
+            output_data = sdscatlen(output_data, &escape, 1);
+            output_data = sdscatlen(output_data, &escaped_escape, 1);
+        } else if (input_data[i] == flag) {
+            output_data = sdscatlen(output_data, &escape, 1);
+            output_data = sdscatlen(output_data, &escaped_flag, 1);
+        } else {
+            output_data = sdscatlen(output_data, &input_data[i], 1);
+        }
+    }
+    return output_data;
+}
+
+// write a fucntion the destuff a byte stream that was stuffed with the previous function
+sds byte_destuffing(sds input_data) {
+    sds output_data = sdsempty();
+
+    uchar escape = ESC;
+    uchar escaped_escape = ESC_SEQ(ESC);
+
+    uchar flag = F;
+    uchar escaped_flag = ESC_SEQ(F);
+
+    for (int i = 0; i < sdslen(input_data); i++) {
+        if (input_data[i] == escape) {
+            if (input_data[i + 1] == escaped_escape) {
+                output_data = sdscatlen(output_data, &escape, 1);
+                i++;
+            } else if (input_data[i + 1] == escaped_flag) {
+                output_data = sdscatlen(output_data, &flag, 1);
+                i++;
+            }
+        } else {
+            output_data = sdscatlen(output_data, &input_data[i], 1);
+        }
+    }
+    return output_data;
 }

@@ -88,20 +88,19 @@ bool llread(int fd, int file) {
 
         if (estado_atual == fs_BCC2_OK) {
             sdsupdatelen(info_buf);
-            data = byte_stuffing(info_buf, false);
+            data = byte_destuffing(info_buf);
             //* Remove bcc1 fom the beginning of the buffer.
             sdsrange(data, 1, -1);
             estado_atual = frame_handler(estado_atual, &frame_atual, validate_bcc2(data));
             //* Remove bcc2 from the end of the buffer.
             sdsrange(data, 0, -2);
             sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
-            INFO("Received data frame: \n\t>>%s\n", data_repr);
+            INFO("Received data frame: \n\t>>%s\n\t>>Lenght: %ld chars\n", data_repr, sdslen(data));
             sdsfree(data_repr);
         }
 
         if (estado_atual == fs_VALID) {
             close = true;
-            sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
             switch (frame_atual) {
                 case ft_SET:
                     write(fd, ua, sdslen(ua));
@@ -139,6 +138,7 @@ bool llread(int fd, int file) {
     sdsfree(rr0);
     sdsfree(rr1);
     sdsfree(disc);
+
     sdsfree(data);
     sdsfree(info_buf);
 
@@ -159,7 +159,11 @@ int main(int argc, char** argv) {
     INFO("New termios structure set.\n");
 
     // 0666 argument created the file with read/write permissions for all users.
-    int file = open(argv[3], O_WRONLY | O_CREAT, 0666);
+    int file = open(argv[2], O_WRONLY | O_CREAT, 0666);
+    if (file < 0) {
+        ERROR("Error opening file %s\n", argv[2]);
+        exit(1);
+    }
     while (!llread(fd, file))
         continue;
     close(file);
