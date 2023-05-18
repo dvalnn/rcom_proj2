@@ -20,11 +20,15 @@ BUILDEXTENS = out
 SERIAL1 = /dev/ttyS10
 SERIAL2 = /dev/ttyS11
 
-INFILE = files/wywh.txt
-OUTFILE = files/received.txt
+
+# INFILE = files/wywh.txt
+# OUTFILE = files/received.txt
 
 # INFILE = files/goat.jpg
 # OUTFILE = files/received.jpg
+
+INFILE = files/penguin.gif
+OUTFILE = files/received.gif
 
 # Targets
 .PHONY: all
