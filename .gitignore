@@ -53,3 +53,5 @@ dkms.conf
 
 # Visual Studio Code
 *.vscode
+
+output.txt
