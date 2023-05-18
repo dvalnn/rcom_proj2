@@ -136,7 +136,7 @@ bool llwrite(int fd, char* filepath) {
         //* Append bcc2 to data frame
         data = sdscat(data, (char*)tail1);
         //* Byte-stuff date and bcc2
-        sds stuffed_data = byte_stuffing_alt(data);
+        sds stuffed_data = byte_stuffing(data);
         sds data_formated = sdscatsds(header, stuffed_data);
         //* Append final flag
         data_formated = sdscat(data_formated, (char*)tail2);

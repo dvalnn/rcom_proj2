@@ -199,7 +199,7 @@ sds byte_stuffing(sds input, bool stuff_string) {
 // write a fucntion to stuff a byte stream.
 // ESC -> ESC ESC_SEQ(ESC)
 // F -> ESC ESC_SEQ(F)
-sds byte_stuffing_alt(sds input_data) {
+sds byte_stuffing(sds input_data) {
     sds output_data = sdsempty();
 
     uchar escape = ESC;

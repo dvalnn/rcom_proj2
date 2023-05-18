@@ -104,8 +104,7 @@ static const uchar FFormat[][FRAME_SIZE] = {FOREACH_FORMAT(GENERATE_ENUM)};
 #define sdsnewframe(frame_type) sdsnewlen(FFormat[frame_type], FRAME_SIZE)
 
 frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved);
-// sds byte_stuffing(sds input, bool stuff_string);
-sds byte_stuffing_alt(sds input_data);
+sds byte_stuffing(sds input_data);
 sds byte_destuffing(sds input_data);
 
 #endif  // _SU_FRAMES_H
