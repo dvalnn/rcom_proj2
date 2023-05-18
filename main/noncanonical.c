@@ -29,15 +29,9 @@
 //     alarm_flag = true;
 // }
 
-void write_to_file(sds data, char* filename) {
-    int file = open(filename, O_WRONLY | O_CREAT | O_APPEND);
-    write(file, data, sdslen(data));
-    close(file);
-}
-
 uchar validate_bcc2(sds data) {
     int bcc2_pos = (int)sdslen(data) - 1;
-
+    LOG("---------------\n");
     LOG("Validating BCC2\n");
     uchar bcc2 = data[0];
     uchar bcc2_expected = data[bcc2_pos];
@@ -49,8 +43,8 @@ uchar validate_bcc2(sds data) {
     }
 
     // ALERT("STRING LENGHT: %ld\n", strlen(data));
-    ALERT("Calculated BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2 & 0xFF), bcc2);
-    ALERT("Expected BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2_expected & 0xFF), bcc2_expected);
+    LOG("Calculated BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2 & 0xFF), bcc2);
+    LOG("Expected BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2_expected & 0xFF), bcc2_expected);
     return bcc2 == bcc2_expected;
 }
 
@@ -81,11 +75,12 @@ bool llread(int fd, int file) {
 
         estado_atual = frame_handler(estado_atual, &frame_atual, rcved);
 
-        if (estado_atual == fs_FLAG1)
-            sdsclear(info_buf);
+        if (frame_atual == ft_INVALID) {
+            break;
+        }
 
         if (estado_atual == fs_INFO) {
-            LOG("Adding 0x%.02x = '%c' to buffer\n\n", (unsigned int)(rcved & 0xFF), rcved);
+            // LOG("Adding 0x%.02x = '%c' to buffer\n\n", (unsigned int)(rcved & 0xFF), rcved);
             char buf[] = {rcved, '\0'};
             info_buf = sdscat(info_buf, buf);
             // LOG("Current Buffer: %s\n\n", info_buf);
@@ -94,16 +89,19 @@ bool llread(int fd, int file) {
         if (estado_atual == fs_BCC2_OK) {
             sdsupdatelen(info_buf);
             data = byte_stuffing(info_buf, false);
-            data = sdsRemoveFreeSpace(data);
-            // Remove bcc1 fom the beginning of the buffer.
+            //* Remove bcc1 fom the beginning of the buffer.
             sdsrange(data, 1, -1);
             estado_atual = frame_handler(estado_atual, &frame_atual, validate_bcc2(data));
-            // Remove bcc2 from the end of the buffer.
+            //* Remove bcc2 from the end of the buffer.
             sdsrange(data, 0, -2);
+            sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
+            INFO("Received data frame: \n\t>>%s\n", data_repr);
+            sdsfree(data_repr);
         }
 
         if (estado_atual == fs_VALID) {
             close = true;
+            sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
             switch (frame_atual) {
                 case ft_SET:
                     write(fd, ua, sdslen(ua));
@@ -120,11 +118,13 @@ bool llread(int fd, int file) {
                     break;
 
                 case ft_INFO0:
+                    INFO("Writing data packet to file\n\n");
                     write(file, data, sdslen(data));
                     write(fd, rr1, sdslen(rr1));
                     break;
 
                 case ft_INFO1:
+                    INFO("Writing data packet to file\n\n");
                     write(file, data, sdslen(data));
                     write(fd, rr0, sdslen(rr0));
                     break;

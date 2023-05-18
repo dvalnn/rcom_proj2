@@ -22,7 +22,7 @@
 #define ALARM_TIMEOUT_SEC 3
 #define ALARM_SLEEP_SEC 1
 
-#define READ_BUFFER_SIZE 1024
+#define READ_BUFFER_SIZE 8
 
 bool alarm_flag = false;
 int alarm_count = 0;
@@ -31,9 +31,9 @@ void alarm_handler(int signum)  // atende alarme
 {
     alarm_count++;
     alarm_flag = true;
-    ALERT("Alarm Interrupt Triggered with code %d - Attempt %d/%d\n", signum, alarm_count, MAX_RETRIES);
+    ERROR("Alarm Interrupt Triggered with code %d - Attempt %d/%d\n", signum, alarm_count, MAX_RETRIES);
     if (alarm_count < MAX_RETRIES) {
-        ALERT("Sleeping for %ds before next attempt\n\n", ALARM_SLEEP_SEC);
+        INFO("Sleeping for %ds before next attempt\n\n", ALARM_SLEEP_SEC);
         sleep(ALARM_SLEEP_SEC);
     }
 }
@@ -80,7 +80,7 @@ bool llopen(int fd) {
     sdsfree(set);
 
     if (success)
-        INFO("Handshake complete\n");
+        INFO("-----\nHandshake complete\n-----\n\n");
     else
         ERROR("Handshake failure - check connection\n");
 
@@ -117,6 +117,8 @@ bool llwrite(int fd, char* filepath) {
     int id = 0;
     uchar buf[READ_BUFFER_SIZE];
 
+    bool success = false;
+
     while (true) {
         int nbytes = read(file, &buf, READ_BUFFER_SIZE);
         if (!nbytes)
@@ -138,18 +140,24 @@ bool llwrite(int fd, char* filepath) {
         sds data_formated = sdscatsds(header, byte_stuffing(data, true));
         data_formated = sdscat(data_formated, (char*)tail);
 
-        sds data_formated_repr = sdscatrepr(sdsempty(), data_formated, sdslen(data_formated));
-        LOG("Formated INFO frame: %s\n", data_formated_repr);
-        LOG("Calculated BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2 & 0xFF), bcc2);
-        send_frame(fd, data_formated, ft_expected);
+        // sds data_formated_repr = sdscatrepr(sdsempty(), data_formated, sdslen(data_formated));
+        sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
+        // LOG("Formated INFO frame: %s\n", data_formated_repr);
+        INFO("Sending data frame: \n\t>>%s\n", data_repr);
+        LOG("Calculated BCC2: 0x%.02x = '%c'\n\n", (unsigned int)(bcc2 & 0xFF), bcc2);
+        success = send_frame(fd, data_formated, ft_expected);
+        if (!success)
+            break;
 
         id = !id;
 
         sdsfree(data);
+        sdsfree(data_repr);
         sdsfree(data_formated);
     }
+
     close(file);
-    return true;
+    return success;
 }
 
 int main(int argc, char** argv) {
@@ -165,14 +173,16 @@ int main(int argc, char** argv) {
     int fd = serial_open(argv[1]);
     serial_config(fd, &oldtio);
 
-    if (!llopen(fd)) {
-        serial_close(fd, &oldtio);
-        INFO("Serial connection closed\n");
-        return -1;
-    }
+    bool is_open = false;
+    bool write_success = false;
 
-    llwrite(fd, argv[2]);
-    llclose(fd);
+    is_open = llopen(fd);
+
+    if (is_open)
+        write_success = llwrite(fd, argv[2]);
+
+    if (is_open && write_success)
+        llclose(fd);
 
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");
