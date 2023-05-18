@@ -105,9 +105,5 @@ static const uchar FFormat[][FRAME_SIZE] = {FOREACH_FORMAT(GENERATE_ENUM)};
 
 frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved);
 sds byte_stuffing(sds input, bool stuff_string);
-uchar read_byte(int fd);
-
-// int read_incomming(int fd, uchar* msg_type);
-// int read_info(int fd, int id); Bom dia!
 
 #endif  // _SU_FRAMES_H
