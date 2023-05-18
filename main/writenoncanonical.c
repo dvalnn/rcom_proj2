@@ -153,8 +153,8 @@ bool llwrite(int fd, char* filepath) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        INFO("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
+    if (argc < 3) {
+        INFO("Usage:\treceiver.out SerialPort InputFileName\n\tex:receiver.out /dev/ttyS1 wywh.txt\n");
         exit(1);
     }
 
@@ -171,10 +171,8 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    llwrite(fd, "wywh.txt");
+    llwrite(fd, argv[2]);
     llclose(fd);
-    // llopen -> llwrite -> llread -> llclose
-    // TODO: llread
 
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");
