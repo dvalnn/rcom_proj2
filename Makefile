@@ -20,8 +20,11 @@ BUILDEXTENS = out
 SERIAL1 = /dev/ttyS10
 SERIAL2 = /dev/ttyS11
 
-INFILE = wywh.txt
-OUTFILE = output.txt
+# INFILE = files/wywh.txt
+# OUTFILE = files/received.txt
+
+INFILE = files/goat.webp
+OUTFILE = files/received.webp
 
 # Targets
 .PHONY: all
