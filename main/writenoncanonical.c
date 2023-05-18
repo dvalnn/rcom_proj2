@@ -48,9 +48,9 @@ void alarm_handler(int signum)  // atende alarme
 {
     alarm_count++;
     alarm_flag = true;
-    ALERT("Alarm Interrupt Triggered with code %d\n", signum);
+    ALERT("Alarm Interrupt Triggered with code %d - Attempt %d/%d\n", signum, alarm_count, MAX_RETRIES);
     if (alarm_count < MAX_RETRIES) {
-        ALERT("Sleeping for %ds before next retry\n\n", ALARM_SLEEP_SEC);
+        ALERT("Sleeping for %ds before next attempt\n\n", ALARM_SLEEP_SEC);
         sleep(ALARM_SLEEP_SEC);
     }
 }
@@ -78,6 +78,7 @@ bool send_frame(int fd, sds packet, frame_type ft_expected) {
 
             if (ft_detected == ft_expected && fs_current == fs_VALID) {
                 alarm(0);
+                alarm_count = 0;
                 success = true;
                 break;
             }
@@ -87,8 +88,6 @@ bool send_frame(int fd, sds packet, frame_type ft_expected) {
 
         alarm_flag = false;
     }
-
-    alarm_count = 0;
     return success;
 }
 
@@ -147,7 +146,7 @@ bool llwrite(int fd, char* filepath) {
 
         sds data_formated_repr = sdscatrepr(sdsempty(), data_formated, sdslen(data_formated));
         LOG("Formated INFO frame: %s\n", data_formated_repr);
-
+        LOG("Calculated BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2 & 0xFF), bcc2);
         send_frame(fd, data_formated, ft_expected);
 
         id = !id;
