@@ -22,7 +22,7 @@
 #define ALARM_TIMEOUT_SEC 3
 #define ALARM_SLEEP_SEC 1
 
-#define READ_BUFFER_SIZE 512
+#define READ_BUFFER_SIZE 1024
 
 bool alarm_flag = false;
 int alarm_count = 0;
