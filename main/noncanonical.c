@@ -51,8 +51,8 @@ uchar validate_bcc2(sds data) {
 bool llread(int fd, int file) {
     uchar rcved;
 
-    frame_type frame_atual = ft_ANY;
-    frame_state estado_atual = fs_FLAG1;
+    frame_type current_frame = ft_ANY;
+    frame_state current_state = fs_FLAG1;
 
     sds ua = sdsnewframe(ft_UA);
     sds rr0 = sdsnewframe(ft_RR0);
@@ -73,25 +73,25 @@ bool llread(int fd, int file) {
         if (!nbytes)
             continue;
 
-        estado_atual = frame_handler(estado_atual, &frame_atual, rcved);
+        current_state = frame_handler(current_state, &current_frame, rcved);
 
-        if (frame_atual == ft_INVALID) {
+        if (current_frame == ft_INVALID) {
             break;
         }
 
-        if (estado_atual == fs_INFO) {
+        if (current_state == fs_INFO) {
             // LOG("Adding 0x%.02x = '%c' to buffer\n\n", (unsigned int)(rcved & 0xFF), rcved);
             char buf[] = {rcved, '\0'};
             info_buf = sdscat(info_buf, buf);
             // LOG("Current Buffer: %s\n\n", info_buf);
         }
 
-        if (estado_atual == fs_BCC2_OK) {
+        if (current_state == fs_BCC2_OK) {
             sdsupdatelen(info_buf);
             data = byte_destuffing(info_buf);
             //* Remove bcc1 fom the beginning of the buffer.
             sdsrange(data, 1, -1);
-            estado_atual = frame_handler(estado_atual, &frame_atual, validate_bcc2(data));
+            current_state = frame_handler(current_state, &current_frame, validate_bcc2(data));
             //* Remove bcc2 from the end of the buffer.
             sdsrange(data, 0, -2);
             sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
@@ -99,9 +99,9 @@ bool llread(int fd, int file) {
             sdsfree(data_repr);
         }
 
-        if (estado_atual == fs_VALID) {
+        if (current_state == fs_VALID) {
             close = true;
-            switch (frame_atual) {
+            switch (current_frame) {
                 case ft_SET:
                     write(fd, ua, sdslen(ua));
                     break;
