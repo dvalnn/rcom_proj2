@@ -22,22 +22,7 @@
 #define RETRY_INTERVAL_SEC 1
 
 // bool alarm_flag = false;
-/*
-#define TIME_OUT(FUNC, RET_VAL)        \
-    {                                  \
-        alarm_flag = false;            \
-        alarm(ALARM_TIMEOUT_SEC);      \
-        while (!alarm_flag) {          \
-            RET_VAL = FUNC;            \
-            if (RET_VAL) {             \
-                alarm(0);              \
-                break;                 \
-            }                          \
-        }                              \
-                                       \
-        ALERT("Command timed out.\n"); \
-    }
-*/
+
 // void alarm_handler(int signum)  // atende alarme
 // {
 //     ALERT("Alarm Interrupt Triggered with code %d\n", signum);
