@@ -122,13 +122,11 @@ bool receiver(int fd, int file) {
                 case ft_INFO0:
                     write(file, data, sdslen(data));
                     write(fd, rr1, sdslen(rr1));
-                    terminate_connection = true;
                     break;
 
                 case ft_INFO1:
                     write(file, data, sdslen(data));
                     write(fd, rr0, sdslen(rr0));
-                    terminate_connection = true;
                     break;
 
                 default:
@@ -153,7 +151,6 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    int file = open("output.txt", O_WRONLY | O_CREAT);
     // (void)signal(SIGALRM, alarm_handler);
 
     struct termios oldtio;
@@ -161,10 +158,12 @@ int main(int argc, char** argv) {
     serial_config(fd, &oldtio);
     INFO("New termios structure set.\n");
 
+    // 0666 argument created the file with read/write permissions for all users.
+    int file = open("output.txt", O_WRONLY | O_CREAT, 0666);
     while (!receiver(fd, file))
         continue;
-
     close(file);
+
     serial_close(fd, &oldtio);
     INFO("Serial connection closed\n");
     return 0;

@@ -10,6 +10,8 @@ frame_type control_byte_handler(uchar byte) {
             return ft_SET;
         case C_UA:
             return ft_UA;
+        case C_DISC:
+            return ft_DISC;
         case C_RR(0):
             return ft_RR0;
         case C_RR(1):

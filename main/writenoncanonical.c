@@ -22,7 +22,7 @@
 #define ALARM_TIMEOUT_SEC 3
 #define ALARM_SLEEP_SEC 1
 
-#define READ_BUFFER_SIZE 4048
+#define READ_BUFFER_SIZE 512
 
 bool alarm_flag = false;
 int alarm_count = 0;
@@ -172,7 +172,7 @@ int main(int argc, char** argv) {
     }
 
     llwrite(fd, "wywh.txt");
-    // llclose(fd);
+    llclose(fd);
     // llopen -> llwrite -> llread -> llclose
     // TODO: llread
 
