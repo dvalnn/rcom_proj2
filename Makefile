@@ -20,6 +20,9 @@ BUILDEXTENS = out
 SERIAL1 = /dev/ttyS10
 SERIAL2 = /dev/ttyS11
 
+INFILE = wywh.txt
+OUTFILE = output.txt
+
 # Targets
 .PHONY: all
 
@@ -41,11 +44,11 @@ socat:
 
 .PHONY: runt
 runt:
-	./$(BIN)/transmitter.$(BUILDEXTENS) $(SERIAL1)
+	./$(BIN)/transmitter.$(BUILDEXTENS) $(SERIAL1) $(INFILE)
 
 .PHONY: runr
 runr:
-	./$(BIN)/receiver.$(BUILDEXTENS) $(SERIAL2)
+	./$(BIN)/receiver.$(BUILDEXTENS) $(SERIAL2) $(OUTFILE)
 
 #.PHONY: all
 #all: $(BIN)/main
@@ -56,7 +59,4 @@ runr:
 #.PHONY: run
 #run: $(BIN)/main
 #	./$(BIN)/main
-#
-#docs: $(BIN)/main
-#	doxygen Doxyfile
 #
