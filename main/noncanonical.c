@@ -53,7 +53,7 @@ void write_to_file(sds data, char* filename) {
 }
 
 uchar validate_bcc2(sds data) {
-    int bcc2_pos = (int)sdslen(data);
+    int bcc2_pos = (int)sdslen(data) - 1;
 
     LOG("Validating BCC2\n");
     uchar bcc2 = data[0];
@@ -82,8 +82,8 @@ bool receiver(int fd) {
     sds rr1 = sdsnewframe(ft_RR1);
     sds disc = sdsnewframe(ft_DISC);
 
-    sds info_buf = sdsnewlen(sdsempty(), READ_BUFFER_SIZE);
-    // sds info_buf = sdsempty();
+    // sds info_buf = sdsnewlen(sdsempty(), READ_BUFFER_SIZE);
+    sds info_buf = sdsempty();
     sds data = sdsempty();
 
     bool close = false;
@@ -97,9 +97,6 @@ bool receiver(int fd) {
         if (!nbytes)
             continue;
 
-        // if (buf_len > sdslen(info_buf))
-        //     sdsgrowzero(info_buf, sdslen(info_buf) + READ_BUFFER_SIZE);
-
         estado_atual = frame_handler(estado_atual, &frame_atual, rcved);
 
         if (estado_atual == fs_FLAG1)
@@ -109,19 +106,18 @@ bool receiver(int fd) {
             LOG("Adding 0x%.02x = '%c' to buffer\n", (unsigned int)(rcved & 0xFF), rcved);
             char buf[] = {rcved, '\0'};
             info_buf = sdscat(info_buf, buf);
-            // info_buf[buf_len] = rcved;
             INFO("Current Buffer: %s\n\n", info_buf);
-            // buf_len++;
         }
 
         if (estado_atual == fs_BCC2_OK) {
             sdsupdatelen(info_buf);
             data = byte_stuffing(info_buf, false);
             data = sdsRemoveFreeSpace(data);
-            // Remove bcc1 and end flag from the data string;
+            // Remove bcc1 fom the beginning of the buffer.
             sdsrange(data, 1, -1);
             estado_atual = frame_handler(estado_atual, &frame_atual, validate_bcc2(data));
-            // buf_len = 0;
+            // Remove bcc2 from the end of the buffer.
+            sdsrange(data, 0, -2);
         }
 
         if (estado_atual == fs_VALID) {
