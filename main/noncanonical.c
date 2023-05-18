@@ -146,8 +146,8 @@ bool llread(int fd, int file) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
+    if (argc < 3) {
+        printf("Usage:\treceiver.out SerialPort OutputFileName\n\tex: receiver.out /dev/ttyS1 output.txt\n");
         exit(1);
     }
 
@@ -159,7 +159,7 @@ int main(int argc, char** argv) {
     INFO("New termios structure set.\n");
 
     // 0666 argument created the file with read/write permissions for all users.
-    int file = open("output.txt", O_WRONLY | O_CREAT, 0666);
+    int file = open(argv[3], O_WRONLY | O_CREAT, 0666);
     while (!llread(fd, file))
         continue;
     close(file);
