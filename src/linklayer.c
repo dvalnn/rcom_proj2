@@ -86,9 +86,13 @@ int llwrite(linkLayer ll, char* filepath) {
         //* Append final flag
         data_formated = sdscat(data_formated, (char*)tail2);
 
+#if _DEBUG >= 2
         sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
         LOG("Sending data frame: \n\t>>%s\n\t>>Lenght: %ld\n", data_repr, sdslen(data));
         LOG("Calculated BCC2: 0x%.02x = '%c'\n\n", (unsigned int)(bcc2 & 0xFF), bcc2);
+        sdsfree(data_repr);
+#endif
+
         success = send_frame(ll, data_formated, ft_expected);
         if (!success)
             break;
@@ -96,7 +100,6 @@ int llwrite(linkLayer ll, char* filepath) {
         id = !id;
 
         sdsfree(data);
-        sdsfree(data_repr);
         sdsfree(stuffed_data);
         sdsfree(data_formated);
     }
@@ -132,10 +135,6 @@ int llread(linkLayer ll, int file) {
 
         current_state = frame_handler(current_state, &current_frame, rcved);
 
-        if (current_frame == ft_INVALID) {
-            break;
-        }
-
         if (current_state == fs_INFO) {
             char buf[] = {rcved, '\0'};
             info_buf = sdscat(info_buf, buf);
@@ -149,9 +148,20 @@ int llread(linkLayer ll, int file) {
             current_state = frame_handler(current_state, &current_frame, validate_bcc2(data));
             //* Remove bcc2 from the end of the buffer.
             sdsrange(data, 0, -2);
+
+#if _DEBUG >= 2
             sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
             LOG("Received data frame: \n\t>>%s\n\t>>Lenght: %ld chars\n", data_repr, sdslen(data));
             sdsfree(data_repr);
+#endif
+        }
+
+        if (current_frame == ft_INVALID) {
+            ERROR("Invalid info frame received. Requesting Retransmission.\n");
+            sds reg = sdsnewframe(current_frame == ft_INFO0 ? ft_REJ0 : ft_REJ1);
+            write(ll.fd, reg, sdslen(reg));
+            sdsfree(reg);
+            break;
         }
 
         if (current_state == fs_VALID) {
@@ -162,12 +172,13 @@ int llread(linkLayer ll, int file) {
                     break;
 
                 case ft_UA:
-                    INFO("Received Last Flag. Closing connection.\n");
+                    INFO("Received DISC Confirmation. Closing connection.\n");
                     continue_reading = false;
                     alarm(0);
                     break;
 
                 case ft_DISC:
+                    INFO("Received DISC. Sending reply and waiting for confirmation\n");
                     write(ll.fd, disc, sdslen(disc));
                     alarm(ll.timeOut);
                     break;
@@ -191,7 +202,7 @@ int llread(linkLayer ll, int file) {
     }
 
     if (force_exit) {
-        ERROR("Did not receive disconnect confirmation. Closing connection by time-out\n");
+        ERROR("Closing connection by time-out\n");
         continue_reading = false;
     }
 

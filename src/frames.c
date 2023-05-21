@@ -91,9 +91,10 @@ frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved)
 
             candidate = control_byte_handler(rcved);
 
-            if (candidate == ft_INVALID)
+            if (candidate == ft_INVALID) {
                 new_state = fs_FLAG1;
-            else
+                candidate = ft_ANY;
+            } else
                 new_state = fs_BCC1_OK;
             break;
 
