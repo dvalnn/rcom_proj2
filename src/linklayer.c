@@ -15,9 +15,6 @@ void serial_close(int fd, struct termios* configs);
 
 bool send_frame(linkLayer ll, sds packet, frame_type ft_expected);
 
-uchar calculate_bcc2(sds data);
-uchar validate_bcc2(sds data);
-
 //* ------------------------------------------------------------------
 
 int llopen(linkLayer* ll) {
@@ -326,26 +323,4 @@ bool send_frame(linkLayer ll, sds packet, frame_type ft_expected) {
         alarm_flag = false;
     }
     return success;
-}
-
-uchar calculate_bcc2(sds data) {
-    uchar bcc2 = data[0];
-    for (int i = 1; i < sdslen(data); i++)
-        bcc2 = bcc2 ^ data[i];
-    return bcc2;
-}
-
-uchar validate_bcc2(sds data) {
-    int bcc2_pos = (int)sdslen(data) - 1;
-    LOG("---------------\n");
-    LOG("Validating BCC2\n");
-    uchar bcc2 = data[0];
-    uchar bcc2_expected = data[bcc2_pos];
-
-    for (int i = 1; i < bcc2_pos; i++)
-        bcc2 = bcc2 ^ data[i];
-
-    LOG("Calculated BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2 & 0xFF), bcc2);
-    LOG("Expected BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2_expected & 0xFF), bcc2_expected);
-    return bcc2 == bcc2_expected;
 }

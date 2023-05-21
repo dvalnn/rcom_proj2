@@ -1,9 +1,5 @@
 #include "frames.h"
 
-sds create_frame(frame_type ftype) {
-    return sdsnewlen(FFormat[ftype], FRAME_SIZE);
-}
-
 frame_type control_byte_handler(uchar byte) {
     switch (byte) {
         case C_SET:
@@ -212,4 +208,26 @@ sds byte_destuffing(sds input_data) {
         }
     }
     return output_data;
+}
+
+uchar calculate_bcc2(sds data) {
+    uchar bcc2 = data[0];
+    for (int i = 1; i < sdslen(data); i++)
+        bcc2 = bcc2 ^ data[i];
+    return bcc2;
+}
+
+uchar validate_bcc2(sds data) {
+    int bcc2_pos = (int)sdslen(data) - 1;
+    LOG("---------------\n");
+    LOG("Validating BCC2\n");
+    uchar bcc2 = data[0];
+    uchar bcc2_expected = data[bcc2_pos];
+
+    for (int i = 1; i < bcc2_pos; i++)
+        bcc2 = bcc2 ^ data[i];
+
+    LOG("Calculated BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2 & 0xFF), bcc2);
+    LOG("Expected BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2_expected & 0xFF), bcc2_expected);
+    return bcc2 == bcc2_expected;
 }

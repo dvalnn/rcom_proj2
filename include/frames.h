@@ -24,6 +24,8 @@
 
 #define FRAME_SIZE 5
 
+typedef unsigned char uchar;
+
 #define SET \
     { F, A1, C_SET, A1 ^ C_SET, F }
 
@@ -41,8 +43,6 @@
 
 #define INFO_HEADER(X) \
     { F, A1, C_NS(X), A1 ^ C_NS(X), F }
-
-typedef unsigned char uchar;
 
 #define FOREACH_STATE(STATE) \
     STATE(fs_FLAG1)          \
@@ -106,5 +106,8 @@ static const uchar FFormat[][FRAME_SIZE] = {FOREACH_FORMAT(GENERATE_ENUM)};
 frame_state frame_handler(frame_state cur_state, frame_type* ftype, uchar rcved);
 sds byte_stuffing(sds input_data);
 sds byte_destuffing(sds input_data);
+
+uchar calculate_bcc2(sds data);
+uchar validate_bcc2(sds data);
 
 #endif  // _SU_FRAMES_H
