@@ -42,7 +42,7 @@ int llopen(linkLayer* ll) {
     else
         ERROR("Handshake failure - check connection\n");
 
-    return success;
+    return success - 1;
 }
 
 int llwrite(linkLayer ll, char* filepath) {
