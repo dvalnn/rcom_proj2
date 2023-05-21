@@ -1,5 +1,5 @@
-#ifndef _SU_FRAMES_H_
-#define _SU_FRAMES_H_
+#ifndef _FRAMES_H_
+#define _FRAMES_H_
 
 #include "log.h"
 #include "sds.h"
