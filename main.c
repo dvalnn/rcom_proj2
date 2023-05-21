@@ -44,14 +44,18 @@ int main(int argc, char* argv[]) {
 
     switch (ll.role) {
         case TRANSMITTER:
-            if (llwrite(ll, argv[3]) < 0) {
+            if (llwrite(ll, argv[3]) < 0)
                 ERROR("Error sending file\n");
-                exit(1);
-            }
             break;
+
         case RECEIVER:
+            int file = open(argv[3], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+            if (file < 0) {
+                ERROR("Error opening file %s\n", argv[3]);
+                break;
+            }
             while (true) {
-                int retval = llread(ll, argv[3]);
+                int retval = llread(ll, file);
                 if (retval < 0) {
                     ERROR("Error receiving file\n");
                     break;

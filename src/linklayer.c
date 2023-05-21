@@ -102,7 +102,7 @@ int llwrite(linkLayer ll, char* filepath) {
     return success - 1;
 }
 
-int llread(linkLayer ll, char* filename) {
+int llread(linkLayer ll, int file) {
     uchar rcved;
 
     frame_type current_frame = ft_ANY;
@@ -118,12 +118,6 @@ int llread(linkLayer ll, char* filename) {
 
     bool close = false;
     bool continue_reading = true;
-
-    int file = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-    if (file < 0) {
-        ERROR("Error opening file %s\n", filename);
-        return -1;
-    }
 
     while (true) {
         if (close)

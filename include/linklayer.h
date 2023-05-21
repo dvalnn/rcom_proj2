@@ -46,7 +46,7 @@ int llopen(linkLayer* connectionParameters);
 // Sends data in buf with size bufSize
 int llwrite(linkLayer ll, char* filepath);
 // Receive data in packet
-int llread(linkLayer ll, char* filename);
+int llread(linkLayer ll, int file);
 // Closes previously opened connection; if showStatistics==TRUE, link layer should print statistics in the console on close
 int llclose(linkLayer connectionParameters, int showStatistics);
 
