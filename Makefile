@@ -4,7 +4,7 @@
 # Parameters
 CC = gcc
 
-DEBUG_LEVEL = 2
+DEBUG_LEVEL = 1
 
 # _DEBUG is used to include internal logging of errors and general information. Levels go from 1 to 3, highest to lowest priority respectively
 CFLAGS = -Wall -Wno-unknown-pragmas -Wno-implicit-function-declaration -Wno-unused-variable -g -D _DEBUG=$(DEBUG_LEVEL)
@@ -22,11 +22,11 @@ SERIAL2 = /dev/ttyS11
 # INFILE = files/wywh.txt
 # OUTFILE = received.txt
 
-# INFILE = files/goat.jpg
-# OUTFILE = received.jpg
-
 INFILE = files/penguin.gif
 OUTFILE = received.gif
+
+# INFILE = files/goat2.jpg
+# OUTFILE = received.jpg
 
 # Targets
 .PHONY: all
