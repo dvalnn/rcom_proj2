@@ -256,8 +256,8 @@ void alarm_handler(int signum)  // atende alarme
 }
 
 void disconnect_handler(int signum) {
-    ERROR("Disconnect Interrupt Triggered with code %d\n", signum);
     force_exit = true;
+    ERROR("Disconnect Interrupt Triggered with code %d\n", signum);
 }
 
 int serial_open(char* serial_port) {
@@ -296,8 +296,8 @@ int serial_config(linkLayer* ll) {
 
     //* VTIME - Timeout in deciseconds for noncanonical read.
     //* VMIN - Minimum number of characters for noncanonical read.
-    // VTIME = 1 para esperar 100 ms por read
     newtio.c_cc[VTIME] = 1;
+    // VTIME = 1 para esperar 100 ms por read
     newtio.c_cc[VMIN] = 0;
 
     tcflush(ll->fd, TCIOFLUSH);
@@ -352,7 +352,7 @@ bool send_frame(linkLayer ll, sds packet, frame_type ft_expected) {
                 break;
             }
         }
-        
+
         if (success)
             break;
 
