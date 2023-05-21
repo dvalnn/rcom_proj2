@@ -4,10 +4,12 @@
 //* ------------------------ AUXILIARY FUNCTIONS ---------------------
 //* ------------------------------------------------------------------
 
-bool alarm_flag = false;
 int alarm_counter = 0;
+int force_exit = false;
+bool alarm_flag = false;
 
 void alarm_handler(int signum);
+void disconnect_handler(int signum);
 
 int serial_open(char* serial_port);
 int serial_config(linkLayer* ll);
@@ -27,8 +29,10 @@ int llopen(linkLayer* ll) {
     if (serial_config(ll) < 0)
         return -1;
 
-    if (ll->role == RECEIVER)
+    if (ll->role == RECEIVER) {
+        (void)signal(SIGALRM, disconnect_handler);
         return 0;
+    }
 
     (void)signal(SIGALRM, alarm_handler);
 
@@ -118,7 +122,7 @@ int llread(linkLayer ll, int file) {
     bool close = false;
     bool continue_reading = true;
 
-    while (true) {
+    while (!force_exit) {
         if (close)
             break;
 
@@ -160,11 +164,12 @@ int llread(linkLayer ll, int file) {
                 case ft_UA:
                     INFO("Received Last Flag. Closing connection.\n");
                     continue_reading = false;
+                    alarm(0);
                     break;
 
                 case ft_DISC:
                     write(ll.fd, disc, sdslen(disc));
-                    continue_reading = false;
+                    alarm(ll.timeOut);
                     break;
 
                 case ft_INFO0:
@@ -183,6 +188,11 @@ int llread(linkLayer ll, int file) {
                     break;
             }
         }
+    }
+
+    if (force_exit) {
+        ERROR("Did not receive disconnect confirmation. Closing connection by time-out\n");
+        continue_reading = false;
     }
 
     sdsfree(ua);
@@ -204,8 +214,14 @@ int llclose(linkLayer ll, int showStatistics) {
     }
 
     sds disc = sdsnewframe(ft_DISC);
+    sds ua = sdsnewframe(ft_UA);
+
     bool success = send_frame(ll, disc, ft_DISC);
+    if (success)
+        write(ll.fd, ua, sdslen(ua));
+
     sdsfree(disc);
+    sdsfree(ua);
 
     if (success)
         INFO("Connection complete\n");
@@ -226,6 +242,11 @@ void alarm_handler(int signum)  // atende alarme
     alarm_counter++;
     alarm_flag = true;
     ERROR("Alarm Interrupt Triggered with code %d - Attempt %d\n", signum, alarm_counter);
+}
+
+void disconnect_handler(int signum) {
+    ERROR("Disconnect Interrupt Triggered with code %d\n", signum);
+    force_exit = true;
 }
 
 int serial_open(char* serial_port) {
