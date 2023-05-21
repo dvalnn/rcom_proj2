@@ -31,12 +31,14 @@ int llopen(linkLayer* ll) {
     if (ll->role == RECEIVER)
         return 0;
 
+    (void)signal(SIGALRM, alarm_handler);
+
     sds set = sdsnewframe(ft_SET);
     bool success = send_frame(*ll, set, ft_UA);
     sdsfree(set);
 
     if (success)
-        INFO("-----\nHandshake complete\n-----\n\n");
+        INFO("----- Handshake complete -----\n\n");
     else
         ERROR("Handshake failure - check connection\n");
 
@@ -82,7 +84,7 @@ int llwrite(linkLayer ll, char* filepath) {
         data_formated = sdscat(data_formated, (char*)tail2);
 
         sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
-        INFO("Sending data frame: \n\t>>%s\n\t>>Lenght: %ld\n", data_repr, sdslen(data));
+        LOG("Sending data frame: \n\t>>%s\n\t>>Lenght: %ld\n", data_repr, sdslen(data));
         LOG("Calculated BCC2: 0x%.02x = '%c'\n\n", (unsigned int)(bcc2 & 0xFF), bcc2);
         success = send_frame(ll, data_formated, ft_expected);
         if (!success)
@@ -115,12 +117,12 @@ int llread(linkLayer ll, char* filename) {
     sds data = sdsempty();
 
     bool close = false;
-    bool terminate_connection = false;
+    bool continue_reading = true;
 
-    int file = open(filename, O_WRONLY | O_CREAT, 0666);
+    int file = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (file < 0) {
         ERROR("Error opening file %s\n", filename);
-        exit(1);
+        return -1;
     }
 
     while (true) {
@@ -138,10 +140,8 @@ int llread(linkLayer ll, char* filename) {
         }
 
         if (current_state == fs_INFO) {
-            // LOG("Adding 0x%.02x = '%c' to buffer\n\n", (unsigned int)(rcved & 0xFF), rcved);
             char buf[] = {rcved, '\0'};
             info_buf = sdscat(info_buf, buf);
-            // LOG("Current Buffer: %s\n\n", info_buf);
         }
 
         if (current_state == fs_BCC2_OK) {
@@ -153,7 +153,7 @@ int llread(linkLayer ll, char* filename) {
             //* Remove bcc2 from the end of the buffer.
             sdsrange(data, 0, -2);
             sds data_repr = sdscatrepr(sdsempty(), data, sdslen(data));
-            INFO("Received data frame: \n\t>>%s\n\t>>Lenght: %ld chars\n", data_repr, sdslen(data));
+            LOG("Received data frame: \n\t>>%s\n\t>>Lenght: %ld chars\n", data_repr, sdslen(data));
             sdsfree(data_repr);
         }
 
@@ -166,12 +166,12 @@ int llread(linkLayer ll, char* filename) {
 
                 case ft_UA:
                     INFO("Received Last Flag. Closing connection.\n");
-                    terminate_connection = true;
+                    continue_reading = false;
                     break;
 
                 case ft_DISC:
                     write(ll.fd, disc, sdslen(disc));
-                    terminate_connection = true;
+                    continue_reading = false;
                     break;
 
                 case ft_INFO0:
@@ -200,12 +200,13 @@ int llread(linkLayer ll, char* filename) {
     sdsfree(data);
     sdsfree(info_buf);
 
-    return terminate_connection;
+    return continue_reading;
 }
 
 int llclose(linkLayer ll, int showStatistics) {
     if (ll.role == RECEIVER) {
         serial_close(ll.fd, &ll.oldtio);
+        INFO("Connection complete\n");
         return 0;
     }
 
@@ -281,7 +282,7 @@ int serial_config(linkLayer* ll) {
         return -1;
     }
 
-    LOG("New termios structure set.\n");
+    INFO("New termios structure set.\n");
 
     return 0;
 }
@@ -345,13 +346,9 @@ uchar validate_bcc2(sds data) {
     uchar bcc2 = data[0];
     uchar bcc2_expected = data[bcc2_pos];
 
-    // LOG("POS 0: 0x%.02x = '%c'\n", (unsigned int)(bcc2 & 0xFF), bcc2);
-    for (int i = 1; i < bcc2_pos; i++) {
-        // LOG("POS %d: 0x%.02x = '%c'\n", i, (unsigned int)(data[i] & 0xFF), data[i]);
+    for (int i = 1; i < bcc2_pos; i++)
         bcc2 = bcc2 ^ data[i];
-    }
 
-    // ALERT("STRING LENGHT: %ld\n", strlen(data));
     LOG("Calculated BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2 & 0xFF), bcc2);
     LOG("Expected BCC2: 0x%.02x = '%c'\n", (unsigned int)(bcc2_expected & 0xFF), bcc2_expected);
     return bcc2 == bcc2_expected;

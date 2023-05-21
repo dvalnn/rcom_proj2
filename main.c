@@ -28,30 +28,40 @@ int main(int argc, char* argv[]) {
     ll.role = NOT_DEFINED;
     strcpy(ll.serialPort, argv[1]);
 
-    if (strcmp(argv[2], "tx") == 0) {
+    if (strcmp(argv[2], "tx") == 0)
         ll.role = TRANSMITTER;
-        if (llopen(&ll) < 0) {
-            ERROR("Error opening connection\n");
-            exit(1);
-        }
-        if (llwrite(ll, argv[3]) < 0) {
-            ERROR("Error sending file\n");
-            exit(1);
-        }
-    } else if (strcmp(argv[2], "rx") == 0) {
+    else if (strcmp(argv[2], "rx") == 0)
         ll.role = RECEIVER;
-        if (llopen(&ll) < 0) {
-            ERROR("Error opening connection\n");
-            exit(1);
-        }
-        while (!llread(ll, argv[3]))
-            continue;
-    } else {
-        ERROR("usage: progname /dev/ttySxx tx|rx filename\n");
+    else {
+        printf("usage: progname /dev/ttySxx tx|rx filename\n");
         exit(1);
     }
 
-    if (llclose(ll, 1) < 0) {
+    if (llopen(&ll) < 0) {
+        ERROR("Error opening connection\n");
+        exit(1);
+    }
+
+    switch (ll.role) {
+        case TRANSMITTER:
+            if (llwrite(ll, argv[3]) < 0) {
+                ERROR("Error sending file\n");
+                exit(1);
+            }
+            break;
+        case RECEIVER:
+            while (true) {
+                int retval = llread(ll, argv[3]);
+                if (retval < 0) {
+                    ERROR("Error receiving file\n");
+                    break;
+                } else if (retval == 0)
+                    break;
+            }
+            break;
+    }
+
+    if (llclose(ll, true) < 0) {
         ERROR("Error closing connection\n");
         exit(1);
     }

@@ -4,7 +4,7 @@
 # Parameters
 CC = gcc
 
-DEBUG_LEVEL = 2
+DEBUG_LEVEL = 1
 
 # _DEBUG is used to include internal logging of errors and general information. Levels go from 1 to 3, highest to lowest priority respectively
 CFLAGS = -Wall -Wno-unknown-pragmas -Wno-implicit-function-declaration -Wno-unused-variable -g -D _DEBUG=$(DEBUG_LEVEL)
@@ -13,57 +13,41 @@ SRC = src
 INCLUDE = include
 BIN = bin
 
-RECEIVER = main/noncanonical.c
-TRANSMITTER = main/writenoncanonical.c
-BUILDEXTENS = out
+APP = main.c
+BUILDEXTENS = exe
 
 SERIAL1 = /dev/ttyS10
 SERIAL2 = /dev/ttyS11
 
-
 # INFILE = files/wywh.txt
-# OUTFILE = files/received.txt
+# OUTFILE = received.txt
 
 # INFILE = files/goat.jpg
-# OUTFILE = files/received.jpg
+# OUTFILE = received.jpg
 
 INFILE = files/penguin.gif
-OUTFILE = files/received.gif
+OUTFILE = received.gif
 
 # Targets
 .PHONY: all
+all: $(BIN)/app.$(BUILDEXTENS)
 
-all: $(BIN)/receiver.$(BUILDEXTENS) $(BIN)/transmitter.$(BUILDEXTENS)
-
-$(BIN)/receiver.$(BUILDEXTENS): $(RECEIVER) $(SRC)/*.c
+$(BIN)/app.$(BUILDEXTENS): $(APP) $(SRC)/*.c
 	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
-
-$(BIN)/transmitter.$(BUILDEXTENS): $(TRANSMITTER) $(SRC)/*.c
-	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
-
-.PHONY: clean
-clean:
-	rm -f $(BIN)/*
 
 .PHONY: socat
 socat: 
 	sudo socat -d -d PTY,link=/dev/ttyS10,mode=777 PTY,link=/dev/ttyS11,mode=777
 
-.PHONY: runt
-runt:
-	./$(BIN)/transmitter.$(BUILDEXTENS) $(SERIAL1) $(INFILE)
+.PHONY: tx
+tx:
+	./$(BIN)/app.$(BUILDEXTENS) $(SERIAL1) tx $(INFILE)
 
-.PHONY: runr
-runr:
-	./$(BIN)/receiver.$(BUILDEXTENS) $(SERIAL2) $(OUTFILE)
+.PHONY: rx
+rx:
+	./$(BIN)/app.$(BUILDEXTENS) $(SERIAL2) rx $(OUTFILE)
 
-#.PHONY: all
-#all: $(BIN)/main
-#
-#$(BIN)/main: main.c $(SRC)/*.c
-#	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
-#
-#.PHONY: run
-#run: $(BIN)/main
-#	./$(BIN)/main
-#
+.PHONY: clean
+clean:
+	rm -f $(BIN)/*
+	rm $(OUTFILE)
