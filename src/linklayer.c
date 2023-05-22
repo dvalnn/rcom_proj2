@@ -328,10 +328,9 @@ bool send_frame(linkLayer ll, sds packet, frame_type ft_expected) {
     frame_state fs_current = fs_FLAG1;
 
     bool success = false;
-
     while (alarm_counter < ll.numTries) {
+        LOG("Writing %s packet\n", FType_STRING[ft_expected]);
         write(ll.fd, packet, sdslen(packet));
-
         alarm(ll.timeOut);
         while (!alarm_flag) {
             int nbytes = read(ll.fd, &rcved, sizeof rcved);
@@ -349,7 +348,7 @@ bool send_frame(linkLayer ll, sds packet, frame_type ft_expected) {
             if ((ft_detected == ft_REJ0 || ft_detected == ft_REJ1) && fs_current == fs_VALID) {
                 ERROR("Received REJ%d retransmission request.\n", ft_detected == ft_REJ0 ? 0 : 1);
                 alarm(0);
-                break;
+                return send_frame(ll, packet, ft_expected);
             }
         }
 
