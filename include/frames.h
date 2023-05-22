@@ -20,7 +20,7 @@
 #define C_DISC 0b000001011
 #define C_RR(X) ((X << 5) | 0b00000001)
 #define C_REJ(X) ((X << 5) | 0b00000101)
-#define     (X) ((X << 5) | 0b00000010)
+#define C_NS(X) ((X << 5) | 0b00000010)
 
 #define FRAME_SIZE 5
 
