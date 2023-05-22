@@ -22,11 +22,11 @@ SERIAL2 = /dev/ttyS11
 # INFILE = files/wywh.txt
 # OUTFILE = received.txt
 
-# INFILE = files/penguin.gif
-# OUTFILE = received.gif
+INFILE = files/penguin.gif
+OUTFILE = received.gif
 
-INFILE = files/goat.jpg
-OUTFILE = received.jpg
+# INFILE = files/goat.jpg
+# OUTFILE = received.jpg
 
 # Targets
 .PHONY: all

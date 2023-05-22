@@ -4,9 +4,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "log.h"
-
 #include "linklayer.h"
+#include "log.h"
 
 /*
  * $1 /dev/ttySxx
@@ -47,7 +46,7 @@ int main(int argc, char* argv[]) {
                 ERROR("Error sending file\n");
             break;
 
-        case RECEIVER:
+        case RECEIVER: {
             int file = open(argv[3], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
             if (file < 0) {
                 ERROR("Error opening file %s\n", argv[3]);
@@ -62,6 +61,7 @@ int main(int argc, char* argv[]) {
                     break;
             }
             break;
+        }
     }
 
     if (llclose(ll, true) < 0) {

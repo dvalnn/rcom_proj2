@@ -158,9 +158,9 @@ int llread(linkLayer ll, int file) {
 
         if (current_frame == ft_INVALID) {
             ERROR("Invalid info frame received. Requesting Retransmission.\n");
-            sds reg = sdsnewframe(current_frame == ft_INFO0 ? ft_REJ0 : ft_REJ1);
-            write(ll.fd, reg, sdslen(reg));
-            sdsfree(reg);
+            sds rej = sdsnewframe(current_frame == ft_INFO0 ? ft_REJ0 : ft_REJ1);
+            write(ll.fd, rej, sdslen(rej));
+            sdsfree(rej);
             break;
         }
 
